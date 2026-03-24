@@ -1,0 +1,15 @@
+:root {
+  --agency-brand-50: #fef2f2;
+  --agency-brand-100: #fee2e2;
+  --agency-brand-500: #ef4444;
+  --agency-brand-600: #dc2626;
+  --agency-brand-700: #b91c1c;
+  --agency-surface: #ffffff;
+  --agency-surface-muted: #f8fafc;
+  --agency-border: #e2e8f0;
+  --agency-text: #0f172a;
+  --agency-text-muted: #64748b;
+  --agency-success: #15803d;
+  --agency-warning: #c2410c;
+  --agency-danger: #b91c1c;
+}

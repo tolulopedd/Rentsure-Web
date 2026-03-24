@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@import "@rentsure/design-tokens/web.css";
+
+:root {
+  font-family: "Avenir Next", Inter, "Segoe UI", sans-serif;
+  color: var(--agency-text);
+  background-color: var(--agency-surface-muted);
+  color-scheme: light;
+  --rentsure-blue: #1200ff;
+  --rentsure-blue-deep: #0a0596;
+  --rentsure-blue-soft: #eef0ff;
+  --rentsure-ink: #050816;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #fafcff, #ffffff);
+}
