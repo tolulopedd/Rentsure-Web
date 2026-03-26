@@ -33,6 +33,15 @@ type SignupResponse = {
   verificationEmailPreviewUrl?: string;
 };
 
+type ResendVerificationResponse = {
+  success: boolean;
+  email: string;
+  alreadyVerified?: boolean;
+  verificationExpiresAt?: string;
+  verificationPreviewUrl?: string;
+  verificationEmailPreviewUrl?: string;
+};
+
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
@@ -55,6 +64,7 @@ export default function Signup() {
   const [searchParams] = useSearchParams();
   const [form, setForm] = useState<SignupFormState>(() => initialForm(searchParams));
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [signupResult, setSignupResult] = useState<SignupResponse | null>(null);
 
@@ -104,6 +114,37 @@ export default function Signup() {
       toast.error(getErrorMessage(error, "Unable to start signup."));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function resendVerification() {
+    const email = (signupResult?.email || form.email).trim();
+    if (!email) {
+      toast.error("Enter your email address first.");
+      return;
+    }
+
+    try {
+      setResending(true);
+      const response = await publicFetch<ResendVerificationResponse>("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email })
+      });
+      if (!response.alreadyVerified) {
+        setSignupResult((current) => ({
+          success: true,
+          email: response.email,
+          status: current?.status || "UNVERIFIED",
+          verificationExpiresAt: response.verificationExpiresAt || current?.verificationExpiresAt || "",
+          verificationPreviewUrl: response.verificationPreviewUrl || current?.verificationPreviewUrl,
+          verificationEmailPreviewUrl: response.verificationEmailPreviewUrl || current?.verificationEmailPreviewUrl
+        }));
+      }
+      toast.success(response.alreadyVerified ? "This email is already verified." : "Verification email sent again.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Unable to resend verification email."));
+    } finally {
+      setResending(false);
     }
   }
 
@@ -164,6 +205,9 @@ export default function Signup() {
                 ) : null}
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                   <Button onClick={() => setSubmitted(false)}>Edit details</Button>
+                  <Button variant="outline" onClick={() => void resendVerification()} disabled={resending}>
+                    {resending ? "Sending..." : "Resend verification"}
+                  </Button>
                   <Button asChild variant="outline">
                     <Link to="/login">Go to sign in</Link>
                   </Button>

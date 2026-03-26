@@ -31,6 +31,29 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [resending, setResending] = useState(false);
+
+  async function resendVerification() {
+    const targetEmail = unverifiedEmail.trim() || email.trim();
+    if (!targetEmail) {
+      toast.error("Enter your email address first.");
+      return;
+    }
+
+    try {
+      setResending(true);
+      await publicFetch<{ success: boolean; alreadyVerified?: boolean }>("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email: targetEmail })
+      });
+      toast.success("Verification email sent again.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Unable to resend verification email."));
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -67,6 +90,7 @@ export default function Login() {
       nav(isAgentRole(role) ? "/app/dashboard" : "/app/rent-score");
     } catch (error: unknown) {
       if (getErrorCode(error) === "EMAIL_NOT_VERIFIED") {
+        setUnverifiedEmail(email.trim());
         toast.error("Verify your email before signing in.");
         return;
       }
@@ -138,6 +162,20 @@ export default function Login() {
               <Button className="w-full" disabled={loading} type="submit">
                 {loading ? "Signing in..." : "Sign in"}
               </Button>
+
+              {unverifiedEmail ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-700">
+                  <div className="font-semibold text-slate-900">Email not verified</div>
+                  <p className="mt-1 leading-6">
+                    We can resend the verification link to <span className="font-medium text-slate-900">{unverifiedEmail}</span>.
+                  </p>
+                  <div className="mt-3">
+                    <Button type="button" variant="outline" onClick={() => void resendVerification()} disabled={resending}>
+                      {resending ? "Sending..." : "Resend verification"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center text-xs text-slate-700">
                 {RENTSURE_RELEASE_LABEL}
