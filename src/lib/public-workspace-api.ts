@@ -6,6 +6,8 @@ export type ProposedRenterDecision = "APPROVED" | "HOLD" | "DECLINED";
 export type ScoreRequestStatus = "REQUESTED" | "FORWARDED" | "REVIEWED";
 export type PaymentScheduleType = "RENT" | "UTILITY" | "ESTATE_DUE";
 export type PaymentScheduleStatus = "PENDING" | "PAID" | "OVERDUE";
+export type RentScorePaymentProvider = "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
+export type RentScorePaymentStatus = "PENDING" | "PENDING_ACTION" | "AWAITING_MANUAL_CONFIRMATION" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
 export type WorkspaceProperty = {
   id: string;
@@ -21,6 +23,10 @@ export type WorkspaceProperty = {
   bathroomCount: number;
   toiletCount: number;
   unitCount: number;
+  isOccupied: boolean;
+  currentTenantName?: string | null;
+  currentTenantEmail?: string | null;
+  currentTenantPhone?: string | null;
   membershipRole: WorkspaceMembershipRole;
   createdAt?: string;
   proposedRenterCount?: number;
@@ -30,6 +36,12 @@ export type WorkspaceProperty = {
     address: string;
     city: string;
     state: string;
+    bedroomCount: number;
+    bathroomCount: number;
+    isOccupied: boolean;
+    currentTenantName?: string | null;
+    currentTenantEmail?: string | null;
+    currentTenantPhone?: string | null;
   }>;
   members: Array<{
     role: WorkspaceMembershipRole;
@@ -110,12 +122,23 @@ export type QueueListItem = {
     requestedBy: string;
     forwardedTo?: string | null;
   } | null;
+  latestRentScorePayment: {
+    id: string;
+    provider: RentScorePaymentProvider;
+    status: RentScorePaymentStatus;
+    amountNgn: number;
+    reference: string;
+    createdAt: string;
+  } | null;
   paymentSchedules: Array<{
     id: string;
     paymentType: PaymentScheduleType;
     amountNgn: number;
     dueDate: string;
     status: PaymentScheduleStatus;
+    confirmationInitiatedAt?: string | null;
+    confirmedAt?: string | null;
+    confirmationTiming?: "ON_TIME" | "LATE" | null;
   }>;
   createdAt: string;
 };
@@ -197,6 +220,25 @@ export type QueueDetail = {
       email: string;
     } | null;
   }>;
+  latestRentScorePayment: {
+    id: string;
+    provider: RentScorePaymentProvider;
+    status: RentScorePaymentStatus;
+    amountNgn: number;
+    currency: string;
+    reference: string;
+    checkoutUrl?: string | null;
+    manualTransferReference?: string | null;
+    notes?: string | null;
+    createdAt: string;
+    manualTransfer?: {
+      bankName: string;
+      accountName: string;
+      accountNumber: string;
+      reference: string;
+      instructions: string;
+    } | null;
+  } | null;
   paymentSchedules: Array<{
     id: string;
     paymentType: PaymentScheduleType;
@@ -205,6 +247,29 @@ export type QueueDetail = {
     status: PaymentScheduleStatus;
     note?: string | null;
     paidAt?: string | null;
+    confirmationNote?: string | null;
+    receiptReference?: string | null;
+    paymentEvidenceObjectKey?: string | null;
+    paymentEvidenceFileName?: string | null;
+    paymentEvidenceMimeType?: string | null;
+    paymentEvidenceFileSize?: number | null;
+    paymentEvidenceUploadedAt?: string | null;
+    paymentEvidenceViewUrl?: string | null;
+    confirmationInitiatedAt?: string | null;
+    confirmationInitiatedBy?: {
+      id: string;
+      name: string;
+      email: string;
+      accountType: "RENTER" | "LANDLORD" | "AGENT";
+    } | null;
+    confirmedAt?: string | null;
+    confirmedBy?: {
+      id: string;
+      name: string;
+      email: string;
+      accountType: "RENTER" | "LANDLORD" | "AGENT";
+    } | null;
+    confirmationTiming?: "ON_TIME" | "LATE" | null;
     createdBy: {
       id: string;
       name: string;
@@ -221,6 +286,8 @@ export type QueueDetail = {
       | "DECISION"
       | "PAYMENT_SCHEDULE_CREATED"
       | "PAYMENT_SCHEDULE_UPDATED"
+      | "PAYMENT_CONFIRMATION_INITIATED"
+      | "PAYMENT_CONFIRMED"
       | "RENTER_PAYMENT_CONFIRMED";
     message: string;
     createdAt: string;
@@ -321,13 +388,17 @@ export function createWorkspaceProperty(input: {
   propertyType: "Duplex" | "Flats" | "Self Contain" | "Mansion" | "Boys Quater";
   bedroomCount: number;
   bathroomCount: number;
-  toiletCount: number;
-  unitCount: number;
+  address: string;
+  state: string;
+  city: string;
   units: Array<{
     label: string;
-    address: string;
-    state: string;
-    city: string;
+    bedroomCount: number;
+    bathroomCount: number;
+    isOccupied: boolean;
+    currentTenantName?: string;
+    currentTenantEmail?: string;
+    currentTenantPhone?: string;
   }>;
 }) {
   return apiFetch<WorkspaceOverview>("/api/workspace/properties", {
@@ -385,6 +456,42 @@ export function requestWorkspaceRentScore(proposedRenterId: string, notes?: stri
   });
 }
 
+export function createRentScorePaymentSession(
+  proposedRenterId: string,
+  input: {
+    provider: RentScorePaymentProvider;
+    notes?: string;
+    callbackPath?: string;
+  }
+) {
+  return apiFetch<{
+    paymentId: string;
+    provider: RentScorePaymentProvider;
+    status: RentScorePaymentStatus;
+    amountNgn: number;
+    currency: string;
+    reference: string;
+    checkoutUrl?: string | null;
+    manualTransfer?: {
+      bankName: string;
+      accountName: string;
+      accountNumber: string;
+      reference: string;
+      instructions: string;
+    } | null;
+  }>(`/api/workspace/queue/${encodeURIComponent(proposedRenterId)}/score-payments`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function verifyRentScorePayment(reference: string) {
+  return apiFetch<QueueDetail>("/api/workspace/score-payments/verify", {
+    method: "POST",
+    body: JSON.stringify({ reference })
+  });
+}
+
 export function decideWorkspaceProposedRenter(
   proposedRenterId: string,
   input: {
@@ -436,5 +543,18 @@ export function updateWorkspacePaymentSchedule(paymentScheduleId: string, status
   return apiFetch<QueueDetail>(`/api/workspace/payment-schedules/${encodeURIComponent(paymentScheduleId)}`, {
     method: "PATCH",
     body: JSON.stringify({ status })
+  });
+}
+
+export function confirmWorkspacePaymentSchedule(
+  paymentScheduleId: string,
+  input?: {
+    paidAt?: string;
+    note?: string;
+  }
+) {
+  return apiFetch<QueueDetail>(`/api/workspace/payment-schedules/${encodeURIComponent(paymentScheduleId)}/confirm`, {
+    method: "POST",
+    body: JSON.stringify(input || {})
   });
 }

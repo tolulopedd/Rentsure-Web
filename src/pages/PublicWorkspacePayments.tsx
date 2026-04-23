@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock3 } from "lucide-react";
+import { CheckCircle2, Clock3, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import {
+  confirmWorkspacePaymentSchedule,
   createWorkspacePaymentSchedule,
   getWorkspaceQueueItem,
   listWorkspaceQueue,
-  updateWorkspacePaymentSchedule,
   type PaymentScheduleType,
   type QueueDetail,
   type QueueListItem
@@ -60,6 +60,7 @@ export default function PublicWorkspacePayments() {
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(emptyScheduleDraft);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -117,6 +118,10 @@ export default function PublicWorkspacePayments() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
+  useEffect(() => {
+    setShowScheduleForm(false);
+  }, [selectedId]);
+
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
@@ -150,6 +155,7 @@ export default function PublicWorkspacePayments() {
       });
       setDetail(response);
       setScheduleDraft(emptyScheduleDraft);
+      setShowScheduleForm(false);
       await loadQueue(detail.id);
       toast.success("Payment schedule logged");
     } catch (error: unknown) {
@@ -157,31 +163,44 @@ export default function PublicWorkspacePayments() {
     }
   }
 
-  async function markSchedulePaid(paymentScheduleId: string) {
+  async function confirmSchedule(paymentScheduleId: string) {
     if (!detail) return;
     try {
-      const response = await updateWorkspacePaymentSchedule(paymentScheduleId, "PAID");
+      const response = await confirmWorkspacePaymentSchedule(paymentScheduleId);
       setDetail(response);
       await loadQueue(detail.id);
-      toast.success("Payment schedule marked as paid");
+      toast.success("Payment confirmed");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to update payment schedule"));
+      toast.error(getErrorMessage(error, "Failed to confirm payment"));
     }
   }
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold tracking-tight text-slate-950">Payments</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Log rent, utility, and estate due schedules only for renters that have already been approved.
-        </p>
+        <Button
+          type="button"
+          variant={showScheduleForm ? "outline" : "default"}
+          onClick={() => setShowScheduleForm((current) => !current)}
+          disabled={!detail}
+          className={!showScheduleForm ? "bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]" : ""}
+        >
+          {showScheduleForm ? (
+            <>
+              <X className="mr-2 h-4 w-4" />
+              Close form
+            </>
+          ) : (
+            "Log payment"
+          )}
+        </Button>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.4fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Renter payment cases</CardTitle>
+            <CardTitle className="text-lg">Tenants</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? <p className="text-sm text-muted-foreground">Loading payment cases...</p> : null}
@@ -221,136 +240,182 @@ export default function PublicWorkspacePayments() {
             {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a renter case to manage payments.</p> : null}
             {detail ? (
               <>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-lg font-semibold text-slate-950">{renterName(detail)}</p>
-                  <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
-                  <p className="mt-2 text-sm text-slate-600">{detail.property.summaryLabel}</p>
-                  <p className="text-xs text-muted-foreground">{detail.property.address}</p>
-                  <div className="mt-3">
-                    <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700" variant="outline">
-                      Approved renter
-                    </Badge>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.85fr)]">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-slate-950">{renterName(detail)}</p>
+                        <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700" variant="outline">
+                          Approved renter
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
+                      <p className="text-sm text-slate-600">{detail.property.summaryLabel}</p>
+                      <p className="text-xs text-muted-foreground">{detail.property.address}</p>
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <SummaryRow label="Decision" value={detail.decision?.decision || "APPROVED"} />
+                      <SummaryRow label="Schedules" value={`${detail.paymentSchedules.length}`} />
+                      <SummaryRow label="Property" value={detail.property.summaryLabel} />
+                    </div>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm font-semibold text-slate-950">Log payment schedule</p>
-                  <div className="mt-4 space-y-4">
-                    <div className="space-y-2">
-                      <Label>Payment type</Label>
-                      <Select value={scheduleDraft.paymentType} onValueChange={(value) => setScheduleDraft((current) => ({ ...current, paymentType: value as PaymentScheduleType }))}>
-                        <SelectTrigger className="bg-white">
-                          <SelectValue placeholder="Select payment type" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white">
-                          <SelectItem value="RENT">Rent</SelectItem>
-                          <SelectItem value="UTILITY">Utility</SelectItem>
-                          <SelectItem value="ESTATE_DUE">Estate due</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                {showScheduleForm ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Amount (NGN)</Label>
-                        <Input value={scheduleDraft.amountNgn} onChange={(event) => setScheduleDraft((current) => ({ ...current, amountNgn: event.target.value }))} className="bg-white" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Due date</Label>
-                        <Input type="date" value={scheduleDraft.dueDate} onChange={(event) => setScheduleDraft((current) => ({ ...current, dueDate: event.target.value }))} className="bg-white" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Note</Label>
-                      <Textarea value={scheduleDraft.note} onChange={(event) => setScheduleDraft((current) => ({ ...current, note: event.target.value }))} className="bg-white" />
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-950">Future recurrence</p>
-                          <p className="mt-1 text-xs text-slate-500">Create additional future schedules from this payment setup.</p>
-                        </div>
-                        <Select
-                          value={scheduleDraft.recurrenceEnabled ? "YES" : "NO"}
-                          onValueChange={(value) => setScheduleDraft((current) => ({ ...current, recurrenceEnabled: value === "YES" }))}
-                        >
-                          <SelectTrigger className="w-[140px] bg-white">
-                            <SelectValue placeholder="Repeat?" />
+                        <Label>Payment type</Label>
+                        <Select value={scheduleDraft.paymentType} onValueChange={(value) => setScheduleDraft((current) => ({ ...current, paymentType: value as PaymentScheduleType }))}>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select payment type" />
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            <SelectItem value="NO">One time</SelectItem>
-                            <SelectItem value="YES">Repeat</SelectItem>
+                            <SelectItem value="RENT">Rent</SelectItem>
+                            <SelectItem value="UTILITY">Utility</SelectItem>
+                            <SelectItem value="ESTATE_DUE">Estate due</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-
-                      {scheduleDraft.recurrenceEnabled ? (
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Frequency</Label>
-                            <Select
-                              value={scheduleDraft.recurrenceFrequency}
-                              onValueChange={(value) =>
-                                setScheduleDraft((current) => ({
-                                  ...current,
-                                  recurrenceFrequency: value as "MONTHLY" | "QUARTERLY" | "YEARLY"
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="bg-white">
-                                <SelectValue placeholder="Select frequency" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white">
-                                <SelectItem value="MONTHLY">Monthly</SelectItem>
-                                <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                                <SelectItem value="YEARLY">Yearly</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Future cycles</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="24"
-                              value={scheduleDraft.recurrenceOccurrences}
-                              onChange={(event) => setScheduleDraft((current) => ({ ...current, recurrenceOccurrences: event.target.value }))}
-                              className="bg-white"
-                            />
-                          </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Amount (NGN)</Label>
+                          <Input value={scheduleDraft.amountNgn} onChange={(event) => setScheduleDraft((current) => ({ ...current, amountNgn: event.target.value }))} className="bg-white" />
                         </div>
-                      ) : null}
+                        <div className="space-y-2">
+                          <Label>Due date</Label>
+                          <Input type="date" value={scheduleDraft.dueDate} onChange={(event) => setScheduleDraft((current) => ({ ...current, dueDate: event.target.value }))} className="bg-white" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Note</Label>
+                        <Textarea value={scheduleDraft.note} onChange={(event) => setScheduleDraft((current) => ({ ...current, note: event.target.value }))} className="bg-white" />
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-950">Future recurrence</p>
+                          </div>
+                          <Select
+                            value={scheduleDraft.recurrenceEnabled ? "YES" : "NO"}
+                            onValueChange={(value) => setScheduleDraft((current) => ({ ...current, recurrenceEnabled: value === "YES" }))}
+                          >
+                            <SelectTrigger className="w-[140px] bg-white">
+                              <SelectValue placeholder="Repeat?" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white">
+                              <SelectItem value="NO">One time</SelectItem>
+                              <SelectItem value="YES">Repeat</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {scheduleDraft.recurrenceEnabled ? (
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Frequency</Label>
+                              <Select
+                                value={scheduleDraft.recurrenceFrequency}
+                                onValueChange={(value) =>
+                                  setScheduleDraft((current) => ({
+                                    ...current,
+                                    recurrenceFrequency: value as "MONTHLY" | "QUARTERLY" | "YEARLY"
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="bg-white">
+                                  <SelectValue placeholder="Select frequency" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white">
+                                  <SelectItem value="MONTHLY">Monthly</SelectItem>
+                                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                                  <SelectItem value="YEARLY">Yearly</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Future cycles</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={scheduleDraft.recurrenceOccurrences}
+                                onChange={(event) => setScheduleDraft((current) => ({ ...current, recurrenceOccurrences: event.target.value }))}
+                                className="bg-white"
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                      <Button onClick={() => void addSchedule()} variant="outline">
+                        Add schedule
+                      </Button>
                     </div>
-                    <Button onClick={() => void addSchedule()} variant="outline">
-                      Add schedule
-                    </Button>
                   </div>
-                </div>
+                ) : null}
 
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold text-slate-950">Existing schedules</p>
+                  <p className="text-sm font-semibold text-slate-950">Payment requests</p>
                   {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules logged yet.</p> : null}
                   {detail.paymentSchedules.map((schedule) => (
-                    <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
+                    <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                        <div className="space-y-2">
                           <p className="font-semibold text-slate-950">{schedule.paymentType.replaceAll("_", " ")}</p>
-                          <p className="text-sm text-slate-600">{formatNgn(schedule.amountNgn)} · due {formatDate(schedule.dueDate)}</p>
-                          {schedule.note ? <p className="mt-1 text-sm text-slate-600">{schedule.note}</p> : null}
+                          {schedule.note ? <p className="text-sm text-slate-600">{schedule.note}</p> : null}
+                          <p className="text-xs text-slate-500">Requested by {schedule.createdBy.name}</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">{schedule.status}</Badge>
-                          {schedule.status !== "PAID" ? (
-                            <Button size="sm" variant="outline" onClick={() => void markSchedulePaid(schedule.id)}>
-                              <CheckCircle2 className="mr-2 h-4 w-4" />
-                              Mark paid
-                            </Button>
-                          ) : (
-                            <div className="flex items-center gap-2 text-sm text-emerald-700">
-                              <Clock3 className="h-4 w-4" />
-                              Paid {formatDate(schedule.paidAt)}
-                            </div>
-                          )}
+                        <div className="space-y-2 text-sm text-slate-600">
+                          <SummaryRow label="Amount" value={formatNgn(schedule.amountNgn)} />
+                          <SummaryRow label="Due" value={formatDate(schedule.dueDate)} />
+                          <SummaryRow label="Status" value={schedule.status} />
+                          <SummaryRow
+                            label="Timing"
+                            value={schedule.confirmationTiming ? (schedule.confirmationTiming === "ON_TIME" ? "On time" : "Late") : "-"}
+                          />
                         </div>
+                      </div>
+                      {schedule.paymentEvidenceFileName ? (
+                        <p className="mt-3 text-xs text-slate-500">Evidence: {schedule.paymentEvidenceFileName}</p>
+                      ) : null}
+                      {schedule.confirmationInitiatedAt ? (
+                        <p className="mt-1 text-xs text-amber-700">Renter sent proof on {formatDate(schedule.confirmationInitiatedAt)}.</p>
+                      ) : (
+                        <p className="mt-1 text-xs text-slate-500">Awaiting renter proof of payment.</p>
+                      )}
+                      {schedule.receiptReference ? (
+                        <p className="mt-1 text-xs text-slate-500">Receipt reference: {schedule.receiptReference}</p>
+                      ) : null}
+                      {schedule.confirmationInitiatedBy ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Initiated by {schedule.confirmationInitiatedBy.name} ({schedule.confirmationInitiatedBy.accountType.toLowerCase()})
+                        </p>
+                      ) : null}
+                      <div className="mt-4 flex items-center gap-3">
+                        {schedule.paymentEvidenceViewUrl ? (
+                          <Button asChild size="sm" variant="outline">
+                            <a href={schedule.paymentEvidenceViewUrl} target="_blank" rel="noreferrer">
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              View proof
+                            </a>
+                          </Button>
+                        ) : null}
+                        {schedule.status !== "PAID" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void confirmSchedule(schedule.id)}
+                            disabled={!schedule.confirmationInitiatedAt}
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Confirm payment
+                          </Button>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm text-emerald-700">
+                            <Clock3 className="h-4 w-4" />
+                            Paid {formatDate(schedule.paidAt)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -360,6 +425,15 @@ export default function PublicWorkspacePayments() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-medium text-slate-900">{value}</span>
     </div>
   );
 }

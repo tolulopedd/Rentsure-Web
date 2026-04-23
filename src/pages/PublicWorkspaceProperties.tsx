@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getErrorMessage } from "@/lib/errors";
+import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 import {
   createWorkspaceProperty,
@@ -17,35 +19,26 @@ import {
 
 type PropertyType = "Duplex" | "Flats" | "Self Contain" | "Mansion" | "Boys Quater";
 
-type UnitDraft = {
-  label: string;
-  state: string;
-  city: string;
-  address: string;
-};
-
 type PropertyDraft = {
   name: string;
   ownerName: string;
   landlordEmail: string;
   propertyType: PropertyType;
-  bedroomCount: number;
-  bathroomCount: number;
-  toiletCount: number;
-  unitCount: number;
-  units: UnitDraft[];
+  state: string;
+  city: string;
+  address: string;
+  units: Array<{
+    label: string;
+    bedroomCount: number;
+    bathroomCount: number;
+    isOccupied: boolean;
+    currentTenantName: string;
+    currentTenantEmail: string;
+    currentTenantPhone: string;
+  }>;
 };
 
 const propertyTypeOptions: PropertyType[] = ["Duplex", "Flats", "Self Contain", "Mansion", "Boys Quater"];
-
-function makeEmptyUnit(index: number): UnitDraft {
-  return {
-    label: `Unit ${index + 1}`,
-    state: "",
-    city: "",
-    address: ""
-  };
-}
 
 function createInitialDraft(): PropertyDraft {
   const rawRole = (localStorage.getItem("userRole") || "LANDLORD").toUpperCase();
@@ -57,11 +50,20 @@ function createInitialDraft(): PropertyDraft {
     ownerName: rawRole === "LANDLORD" ? userName : "",
     landlordEmail: rawRole === "LANDLORD" ? userEmail : "",
     propertyType: "Flats",
-    bedroomCount: 3,
-    bathroomCount: 3,
-    toiletCount: 4,
-    unitCount: 1,
-    units: [makeEmptyUnit(0)]
+    state: "",
+    city: "",
+    address: "",
+    units: [
+      {
+        label: "Ground Floor",
+        bedroomCount: 2,
+        bathroomCount: 2,
+        isOccupied: false,
+        currentTenantName: "",
+        currentTenantEmail: "",
+        currentTenantPhone: ""
+      }
+    ]
   };
 }
 
@@ -72,14 +74,21 @@ export default function PublicWorkspaceProperties() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stateQueryByUnit, setStateQueryByUnit] = useState<Record<number, string>>({});
-  const [cityQueryByUnit, setCityQueryByUnit] = useState<Record<number, string>>({});
-  const [showStateLovByUnit, setShowStateLovByUnit] = useState<Record<number, boolean>>({});
-  const [showCityLovByUnit, setShowCityLovByUnit] = useState<Record<number, boolean>>({});
-  const [showAddressLovByUnit, setShowAddressLovByUnit] = useState<Record<number, boolean>>({});
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [stateQuery, setStateQuery] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [showStateLov, setShowStateLov] = useState(false);
+  const [showCityLov, setShowCityLov] = useState(false);
+  const [showAddressLov, setShowAddressLov] = useState(false);
+  const [citySuggestions, setCitySuggestions] = useState<MapboxSearchSuggestion[]>([]);
+  const [addressSuggestions, setAddressSuggestions] = useState<MapboxSearchSuggestion[]>([]);
+  const [cityLookupLoading, setCityLookupLoading] = useState(false);
+  const [addressLookupLoading, setAddressLookupLoading] = useState(false);
+  const [searchSessionToken, setSearchSessionToken] = useState(() => crypto.randomUUID());
 
   const rawRole = (localStorage.getItem("userRole") || "LANDLORD").toUpperCase();
   const isLandlord = rawRole === "LANDLORD";
+  const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() || "";
 
   async function loadProperties() {
     try {
@@ -98,89 +107,287 @@ export default function PublicWorkspaceProperties() {
     void loadProperties();
   }, []);
 
-  function syncUnits(nextCount: number) {
-    setDraft((current) => {
-      const units = Array.from({ length: nextCount }, (_, index) => current.units[index] ?? makeEmptyUnit(index)).map((unit, index) => ({
-        ...unit,
-        label: unit.label || `Unit ${index + 1}`
-      }));
-      return {
-        ...current,
-        unitCount: nextCount,
-        units
-      };
-    });
+  useEffect(() => {
+    setStateQuery(draft.state);
+  }, [draft.state]);
+
+  useEffect(() => {
+    setCityQuery(draft.city);
+  }, [draft.city]);
+
+  function resetForm() {
+    setDraft(createInitialDraft());
+    setShowAddForm(false);
+    setStateQuery("");
+    setCityQuery("");
+    setShowStateLov(false);
+    setShowCityLov(false);
+    setShowAddressLov(false);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
+    setSearchSessionToken(crypto.randomUUID());
   }
 
-  function updateUnit(index: number, patch: Partial<UnitDraft>) {
-    setDraft((current) => ({
-      ...current,
-      units: current.units.map((unit, unitIndex) => (unitIndex === index ? { ...unit, ...patch } : unit))
-    }));
+  function normalizeLocationName(value: string) {
+    return value.trim().toLowerCase().replace(/\s+state$/, "");
   }
 
-  function selectState(index: number, state: string) {
-    setStateQueryByUnit((current) => ({ ...current, [index]: state }));
-    setCityQueryByUnit((current) => ({ ...current, [index]: "" }));
-    setShowStateLovByUnit((current) => ({ ...current, [index]: false }));
-    setShowAddressLovByUnit((current) => ({ ...current, [index]: false }));
-    updateUnit(index, { state, city: "", address: "" });
+  function mapboxCityLabel(suggestion: MapboxSearchSuggestion) {
+    return suggestion.name_preferred || suggestion.name;
   }
 
-  function selectCity(index: number, city: string) {
-    setCityQueryByUnit((current) => ({ ...current, [index]: city }));
-    setShowCityLovByUnit((current) => ({ ...current, [index]: false }));
-    setShowAddressLovByUnit((current) => ({ ...current, [index]: false }));
-    updateUnit(index, { city, address: "" });
+  function mapboxStateLabel(suggestion: MapboxSearchSuggestion) {
+    return suggestion.context?.region?.name || "";
   }
 
-  function selectAddress(index: number, address: string) {
-    setShowAddressLovByUnit((current) => ({ ...current, [index]: false }));
-    updateUnit(index, { address });
+  function mapboxAddressLabel(suggestion: MapboxSearchSuggestion) {
+    return suggestion.address || suggestion.name || suggestion.full_address || "";
   }
 
-  function filteredStates(index: number) {
-    const query = (stateQueryByUnit[index] ?? "").trim().toLowerCase();
+  function mapboxResolvedCity(suggestion: MapboxSearchSuggestion) {
+    return suggestion.context?.locality?.name || suggestion.context?.place?.name || mapboxCityLabel(suggestion) || "";
+  }
+
+  function mapboxSuggestionMatchesCity(suggestion: MapboxSearchSuggestion, city: string) {
+    const expected = normalizeLocationName(city);
+    const candidates = [suggestion.context?.locality?.name, suggestion.context?.place?.name, suggestion.name_preferred, suggestion.name]
+      .filter(Boolean)
+      .map((value) => normalizeLocationName(String(value)));
+
+    return candidates.some((value) => value === expected);
+  }
+
+  const filteredStates = useMemo(() => {
+    const query = stateQuery.trim().toLowerCase();
     if (!query) return nigerianStates;
     return nigerianStates.filter((state) => state.toLowerCase().includes(query));
-  }
+  }, [stateQuery]);
 
-  function filteredCities(index: number) {
-    const query = (cityQueryByUnit[index] ?? "").trim().toLowerCase();
-    const state = draft.units[index]?.state;
-    const cities = state ? nigeriaStateCityMap[state] ?? [] : [];
+  const filteredCities = useMemo(() => {
+    const query = cityQuery.trim().toLowerCase();
+    const cities = draft.state ? nigeriaStateCityMap[draft.state] ?? [] : [];
     return cities.filter((city) => !query || city.toLowerCase().includes(query));
-  }
+  }, [cityQuery, draft.state]);
 
-  function filteredAddresses(index: number) {
-    const unit = draft.units[index];
-    if (!unit?.state || !unit.city) return [];
-    const query = unit.address.trim().toLowerCase();
+  const filteredAddresses = useMemo(() => {
+    const query = draft.address.trim().toLowerCase();
     return Array.from(
       new Map(
         fallbackNigeriaAddressSuggestions
-          .filter((item) => item.state === unit.state && item.city === unit.city)
+          .filter((item) => (!draft.state || item.state === draft.state) && (!draft.city || item.city === draft.city))
           .filter((item) => !query || item.value.toLowerCase().includes(query))
           .map((item) => [item.value, item])
       ).values()
     ).slice(0, 6);
+  }, [draft.address, draft.city, draft.state]);
+
+  useEffect(() => {
+    if (!showCityLov) {
+      setCitySuggestions([]);
+      setCityLookupLoading(false);
+      return;
+    }
+
+    const query = cityQuery.trim();
+    if (!mapboxAccessToken || query.length < 2) {
+      setCitySuggestions([]);
+      setCityLookupLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setCityLookupLoading(true);
+        const suggestions = await searchMapboxSuggestions({
+          accessToken: mapboxAccessToken,
+          query: draft.state ? `${query} ${draft.state}` : query,
+          sessionToken: searchSessionToken,
+          types: ["city", "locality", "place"],
+          limit: 6
+        });
+
+        if (isCancelled) return;
+
+        const nextSuggestions = suggestions.filter((suggestion) => {
+          if (!draft.state) return true;
+          const regionName = mapboxStateLabel(suggestion);
+          return !regionName || normalizeLocationName(regionName) === normalizeLocationName(draft.state);
+        });
+
+        setCitySuggestions(nextSuggestions);
+      } catch {
+        if (!isCancelled) {
+          setCitySuggestions([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setCityLookupLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [cityQuery, draft.state, mapboxAccessToken, searchSessionToken, showCityLov]);
+
+  useEffect(() => {
+    if (!showAddressLov) {
+      setAddressSuggestions([]);
+      setAddressLookupLoading(false);
+      return;
+    }
+
+    const query = draft.address.trim();
+    if (!mapboxAccessToken || query.length < 3) {
+      setAddressSuggestions([]);
+      setAddressLookupLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setAddressLookupLoading(true);
+        const suggestions = await searchMapboxSuggestions({
+          accessToken: mapboxAccessToken,
+          query: [query, draft.city, draft.state].filter(Boolean).join(" "),
+          sessionToken: searchSessionToken,
+          types: ["address", "street"],
+          limit: 6
+        });
+
+        if (isCancelled) return;
+
+        const nextSuggestions = suggestions.filter((suggestion) => {
+          const regionName = mapboxStateLabel(suggestion);
+          const stateMatches =
+            !draft.state || !regionName || normalizeLocationName(regionName) === normalizeLocationName(draft.state);
+          const cityMatches = !draft.city || mapboxSuggestionMatchesCity(suggestion, draft.city);
+          return stateMatches && cityMatches;
+        });
+
+        setAddressSuggestions(nextSuggestions);
+      } catch {
+        if (!isCancelled) {
+          setAddressSuggestions([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setAddressLookupLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [draft.address, draft.city, draft.state, mapboxAccessToken, searchSessionToken, showAddressLov]);
+
+  function selectState(state: string) {
+    setStateQuery(state);
+    setShowStateLov(false);
+    setShowCityLov(false);
+    setShowAddressLov(false);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
+    setSearchSessionToken(crypto.randomUUID());
+    setDraft((current) => ({
+      ...current,
+      state,
+      city: current.state === state ? current.city : "",
+      address: current.state === state ? current.address : ""
+    }));
+    if (draft.state !== state) {
+      setCityQuery("");
+    }
+  }
+
+  function selectCity(city: string, state?: string) {
+    setCityQuery(city);
+    setShowCityLov(false);
+    setShowAddressLov(false);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
+    setDraft((current) => ({
+      ...current,
+      state: state || current.state,
+      city,
+      address: state && current.state !== state ? "" : current.address
+    }));
+    if (state) {
+      setStateQuery(state);
+    }
+  }
+
+  function selectAddress(address: string, city?: string, state?: string) {
+    setShowAddressLov(false);
+    setAddressSuggestions([]);
+    setDraft((current) => ({
+      ...current,
+      state: state || current.state,
+      city: city || current.city,
+      address
+    }));
+    if (city) {
+      setCityQuery(city);
+    }
+    if (state) {
+      setStateQuery(state);
+    }
+  }
+
+  function updateUnit(index: number, label: string) {
+    setDraft((current) => ({
+      ...current,
+      units: current.units.map((unit, unitIndex) => (unitIndex === index ? { ...unit, label } : unit))
+    }));
+  }
+
+  function addUnit() {
+    setDraft((current) => ({
+      ...current,
+      units: [
+        ...current.units,
+        {
+          label: `Unit ${current.units.length + 1}`,
+          bedroomCount: 1,
+          bathroomCount: 1,
+          isOccupied: false,
+          currentTenantName: "",
+          currentTenantEmail: "",
+          currentTenantPhone: ""
+        }
+      ]
+    }));
+  }
+
+  function removeUnit(index: number) {
+    setDraft((current) => ({
+      ...current,
+      units: current.units.filter((_, unitIndex) => unitIndex !== index)
+    }));
   }
 
   function validateDraft() {
-    if (!draft.name.trim()) return "Enter a property name.";
+    if (!draft.name.trim()) return "Enter a property description.";
     if (!draft.ownerName.trim()) return "Enter the property owner name.";
     if (!draft.landlordEmail.trim()) return "Enter the landlord email.";
-    if (!draft.bedroomCount || draft.bedroomCount < 1) return "Enter a valid number of bedrooms.";
-    if (!draft.bathroomCount || draft.bathroomCount < 1) return "Enter a valid number of bathrooms.";
-    if (!draft.toiletCount || draft.toiletCount < 1) return "Enter a valid number of toilets.";
-    if (!draft.unitCount || draft.unitCount < 1) return "Enter a valid number of units.";
-    if (draft.units.length !== draft.unitCount) return "Unit count must match the unit entries.";
-
-    for (const [index, unit] of draft.units.entries()) {
-      if (!unit.label.trim()) return `Enter a label for unit ${index + 1}.`;
-      if (!unit.state.trim()) return `Select a state for unit ${index + 1}.`;
-      if (!unit.city.trim()) return `Select a city/town for unit ${index + 1}.`;
-      if (!unit.address.trim()) return `Enter an address for unit ${index + 1}.`;
+    if (!draft.state.trim()) return "Select a state.";
+    if (!draft.city.trim()) return "Select a city/town.";
+    if (!draft.address.trim()) return "Enter the property address.";
+    if (!draft.units.length) return "Add at least one unit detail.";
+    if (draft.units.some((unit) => !unit.label.trim())) return "Enter a label for each unit detail.";
+    if (draft.units.some((unit) => unit.bedroomCount < 1)) return "Enter a valid number of rooms for each unit.";
+    if (draft.units.some((unit) => unit.bathroomCount < 1)) return "Enter a valid number of bathrooms for each unit.";
+    if (draft.units.some((unit) => unit.isOccupied && !unit.currentTenantName.trim())) {
+      return "Enter the current tenant name for each occupied unit.";
+    }
+    if (draft.units.some((unit) => unit.isOccupied && !unit.currentTenantPhone.trim())) {
+      return "Enter the current tenant phone number for each occupied unit.";
     }
 
     return null;
@@ -200,24 +407,25 @@ export default function PublicWorkspaceProperties() {
         ownerName: draft.ownerName.trim(),
         landlordEmail: draft.landlordEmail.trim(),
         propertyType: draft.propertyType,
-        bedroomCount: draft.bedroomCount,
-        bathroomCount: draft.bathroomCount,
-        toiletCount: draft.toiletCount,
-        unitCount: draft.unitCount,
+        bedroomCount: draft.units[0]?.bedroomCount ?? 1,
+        bathroomCount: draft.units[0]?.bathroomCount ?? 1,
+        state: draft.state.trim(),
+        city: draft.city.trim(),
+        address: draft.address.trim(),
         units: draft.units.map((unit) => ({
           label: unit.label.trim(),
-          address: unit.address.trim(),
-          state: unit.state.trim(),
-          city: unit.city.trim()
+          bedroomCount: unit.bedroomCount,
+          bathroomCount: unit.bathroomCount,
+          isOccupied: unit.isOccupied,
+          currentTenantName: unit.isOccupied ? unit.currentTenantName.trim() : undefined,
+          currentTenantEmail: unit.isOccupied ? unit.currentTenantEmail.trim() : undefined,
+          currentTenantPhone: unit.isOccupied ? unit.currentTenantPhone.trim() : undefined
         }))
       });
+
       setItems(response.properties);
       setDraft(createInitialDraft());
-      setStateQueryByUnit({});
-      setCityQueryByUnit({});
-      setShowStateLovByUnit({});
-      setShowCityLovByUnit({});
-      setShowAddressLovByUnit({});
+      setShowAddForm(false);
       toast.success("Property added to workspace");
     } catch (saveError: unknown) {
       toast.error(getErrorMessage(saveError, "Failed to create property"));
@@ -229,7 +437,7 @@ export default function PublicWorkspaceProperties() {
   async function shareProperty(propertyId: string) {
     const email = shareEmailById[propertyId]?.trim();
     if (!email) {
-      toast.error("Enter the landlord or agent email to share this property");
+      toast.error("Enter the agent email to share this property");
       return;
     }
 
@@ -237,110 +445,227 @@ export default function PublicWorkspaceProperties() {
       const response = await shareWorkspaceProperty(propertyId, email);
       setItems(response.items);
       setShareEmailById((current) => ({ ...current, [propertyId]: "" }));
-      toast.success("Property shared");
+      toast.success("Property shared with agent");
     } catch (shareError: unknown) {
       toast.error(getErrorMessage(shareError, "Failed to share property"));
     }
   }
 
-  const propertySummary = useMemo(
-    () =>
-      `Create a landlord-linked ${draft.bedroomCount} bedroom ${draft.propertyType === "Flats" ? "flat" : draft.propertyType.toLowerCase()} with ${draft.unitCount} unit${
-        draft.unitCount === 1 ? "" : "s"
-      } and a verified Nigerian address trail.`,
-    [draft.bedroomCount, draft.propertyType, draft.unitCount]
-  );
+  const visibleCitySuggestions = citySuggestions.length
+    ? citySuggestions.map((suggestion) => ({
+        key: suggestion.mapbox_id,
+        city: mapboxCityLabel(suggestion),
+        state: mapboxStateLabel(suggestion)
+      }))
+    : filteredCities.map((city) => ({
+        key: city,
+        city,
+        state: draft.state
+      }));
+
+  const visibleAddressSuggestions = addressSuggestions.length
+    ? addressSuggestions.map((suggestion) => ({
+        key: suggestion.mapbox_id,
+        address: mapboxAddressLabel(suggestion),
+        city: mapboxResolvedCity(suggestion) || draft.city,
+        state: mapboxStateLabel(suggestion) || draft.state
+      }))
+    : filteredAddresses.map((suggestion) => ({
+        key: suggestion.value,
+        address: suggestion.value,
+        city: suggestion.city,
+        state: suggestion.state
+      }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Properties</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Add landlord-linked properties, define property type and unit count, and capture each unit address clearly for review and payment operations.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Properties</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track each linked property by location. Add one property per address, then add another entry when you want
+            to capture a different building, a new location, or another same-location property separately.
+          </p>
+        </div>
+
+        <Button
+          onClick={() => setShowAddForm((current) => !current)}
+          className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+        >
+          {showAddForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+          {showAddForm ? "Close form" : "Add property"}
+        </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_1.15fr]">
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Linked properties</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loading ? <p className="text-sm text-muted-foreground">Loading properties...</p> : null}
-            {!loading && error ? <p className="text-sm text-rose-600">{error}</p> : null}
-            {!loading && !items.length && !error ? <p className="text-sm text-muted-foreground">No properties linked yet.</p> : null}
-            {items.map((property) => (
-              <div key={property.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-950">{property.summaryLabel}</p>
-                      <Badge variant="outline">{property.membershipRole}</Badge>
-                      <Badge variant="outline">{property.propertyType}</Badge>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">Owner: {property.ownerName}</p>
-                    <p className="text-sm text-slate-600">Landlord email: {property.landlordEmail}</p>
-                    <p className="text-sm text-slate-600">
-                      {property.bedroomCount} room{property.bedroomCount === 1 ? "" : "s"} · {property.bathroomCount} bathroom{property.bathroomCount === 1 ? "" : "s"} · {property.toiletCount} toilet{property.toiletCount === 1 ? "" : "s"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {property.unitCount} unit{property.unitCount === 1 ? "" : "s"} linked to this property
-                    </p>
-                  </div>
-                  <div className="text-sm text-slate-600">{property.proposedRenterCount ?? 0} proposed renters</div>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Unit addresses</p>
-                  <div className="mt-3 space-y-3">
-                    {property.units.map((unit) => (
-                      <div key={unit.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-sm font-semibold text-slate-950">{unit.label}</p>
-                        <p className="mt-1 text-sm text-slate-600">{unit.address}</p>
-                        <p className="text-xs text-muted-foreground">{unit.city}, {unit.state}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Linked accounts</p>
-                  <div className="mt-3 space-y-2">
-                    {property.members.map((member) => (
-                      <div key={`${property.id}-${member.accountId}-${member.role}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <div>
-                          <span className="font-medium text-slate-950">{member.name}</span>
-                          <span className="ml-2 text-slate-500">{member.email}</span>
-                        </div>
-                        <Badge variant="outline">{member.role}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-                  <Input
-                    value={shareEmailById[property.id] || ""}
-                    onChange={(event) => setShareEmailById((current) => ({ ...current, [property.id]: event.target.value }))}
-                    placeholder="Share with landlord or agent email"
-                    className="bg-white"
-                  />
-                  <Button variant="outline" onClick={() => void shareProperty(property.id)}>
-                    Share property
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
+      {showAddForm ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Add property</CardTitle>
-            <p className="text-sm text-muted-foreground">{propertySummary}</p>
+            <p className="text-sm text-muted-foreground">
+              Capture one property location at a time. If the property is already occupied, add the current tenant
+              details so the record is easier to identify later.
+            </p>
           </CardHeader>
           <CardContent className="space-y-5">
-            <TextField label="Property name" value={draft.name} onChange={(value) => setDraft((current) => ({ ...current, name: value }))} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
+                label="Property description"
+                value={draft.name}
+                onChange={(value) => setDraft((current) => ({ ...current, name: value }))}
+                placeholder="3 bedroom flat at Forthright Estate"
+              />
+              <div className="space-y-2">
+                <Label>Property type</Label>
+                <Select
+                  value={draft.propertyType}
+                  onValueChange={(value: PropertyType) => setDraft((current) => ({ ...current, propertyType: value }))}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select property type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {propertyTypeOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>State</Label>
+                <div className="relative">
+                  <Input
+                    className="bg-white"
+                    value={stateQuery}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setStateQuery(nextValue);
+                      setShowStateLov(true);
+                      setDraft((current) => ({
+                        ...current,
+                        state: nextValue,
+                        city: current.state === nextValue ? current.city : "",
+                        address: current.state === nextValue ? current.address : ""
+                      }));
+                      if (draft.state !== nextValue) {
+                        setCityQuery("");
+                      }
+                    }}
+                    onFocus={() => setShowStateLov(true)}
+                    placeholder="Type to search states in Nigeria"
+                  />
+                  {showStateLov ? (
+                    <LovPanel>
+                      {filteredStates.length ? (
+                        filteredStates.map((state) => (
+                          <LovButton key={state} onClick={() => selectState(state)}>
+                            <span>{state}</span>
+                            {normalizeLocationName(draft.state) === normalizeLocationName(state) ? <SelectedPill /> : null}
+                          </LovButton>
+                        ))
+                      ) : (
+                        <LovEmpty text="No Nigerian state matches that search." />
+                      )}
+                    </LovPanel>
+                  ) : null}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>City/Town</Label>
+                <div className="relative">
+                  <Input
+                    className="bg-white"
+                    value={cityQuery}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setCityQuery(nextValue);
+                      setShowCityLov(true);
+                      setDraft((current) => ({
+                        ...current,
+                        city: nextValue,
+                        address: nextValue === current.city ? current.address : ""
+                      }));
+                    }}
+                    onFocus={() => setShowCityLov(true)}
+                    placeholder={draft.state ? `Type to search cities in ${draft.state}` : "Type to search city/town"}
+                  />
+                  {showCityLov ? (
+                    <LovPanel>
+                      {cityLookupLoading ? <LovEmpty text="Searching city/town suggestions..." /> : null}
+                      {!cityLookupLoading && visibleCitySuggestions.length ? (
+                        visibleCitySuggestions.map((suggestion) => (
+                          <LovButton key={suggestion.key} onClick={() => selectCity(suggestion.city, suggestion.state || undefined)}>
+                            <div className="flex items-center justify-between gap-3">
+                              <span>{suggestion.city}</span>
+                              {suggestion.state ? (
+                                <span className="text-xs uppercase tracking-[0.12em] text-slate-400">{suggestion.state}</span>
+                              ) : null}
+                            </div>
+                            {draft.city === suggestion.city ? <SelectedPill /> : null}
+                          </LovButton>
+                        ))
+                      ) : null}
+                      {!cityLookupLoading && !visibleCitySuggestions.length ? (
+                        <LovEmpty
+                          text={
+                            mapboxAccessToken
+                              ? "No city/town suggestion matched that search. Continue typing to use your own city/town."
+                              : "Set VITE_MAPBOX_ACCESS_TOKEN to use live city/town suggestions."
+                          }
+                        />
+                      ) : null}
+                    </LovPanel>
+                  ) : null}
+                </div>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Address</Label>
+                <div className="relative">
+                  <Input
+                    className="bg-white"
+                    value={draft.address}
+                    onChange={(event) => {
+                      setDraft((current) => ({ ...current, address: event.target.value }));
+                      setShowAddressLov(true);
+                    }}
+                    onFocus={() => setShowAddressLov(true)}
+                    placeholder={draft.city ? `Start typing an address in ${draft.city}` : "Start typing an address"}
+                  />
+                  {showAddressLov ? (
+                    <LovPanel>
+                      {addressLookupLoading ? <LovEmpty text="Searching address suggestions..." /> : null}
+                      {!addressLookupLoading && visibleAddressSuggestions.length ? (
+                        visibleAddressSuggestions.map((suggestion) => (
+                          <LovButton
+                            key={suggestion.key}
+                            onClick={() => selectAddress(suggestion.address, suggestion.city || undefined, suggestion.state || undefined)}
+                          >
+                            <span>{suggestion.address}</span>
+                            <span className="text-xs uppercase tracking-[0.12em] text-slate-400">
+                              {suggestion.city}, {suggestion.state}
+                            </span>
+                          </LovButton>
+                        ))
+                      ) : null}
+                      {!addressLookupLoading && !visibleAddressSuggestions.length ? (
+                        <LovEmpty
+                          text={
+                            mapboxAccessToken
+                              ? "No address suggestion matched yet. Keep typing to refine the address."
+                              : "Set VITE_MAPBOX_ACCESS_TOKEN to use live address suggestions."
+                          }
+                        />
+                      ) : null}
+                    </LovPanel>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
                 label="Property owner"
@@ -356,183 +681,249 @@ export default function PublicWorkspaceProperties() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Property type</Label>
-                <Select value={draft.propertyType} onValueChange={(value) => setDraft((current) => ({ ...current, propertyType: value as PropertyType }))}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Select property type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {propertyTypeOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>No of units</Label>
-                <Input
-                  className="bg-white"
-                  min={1}
-                  type="number"
-                  value={draft.unitCount}
-                  onChange={(event) => syncUnits(Math.max(1, Number(event.target.value) || 1))}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label>No of rooms</Label>
-                <Input
-                  className="bg-white"
-                  min={1}
-                  type="number"
-                  value={draft.bedroomCount}
-                  onChange={(event) => setDraft((current) => ({ ...current, bedroomCount: Math.max(1, Number(event.target.value) || 1) }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>No of bathrooms</Label>
-                <Input
-                  className="bg-white"
-                  min={1}
-                  type="number"
-                  value={draft.bathroomCount}
-                  onChange={(event) => setDraft((current) => ({ ...current, bathroomCount: Math.max(1, Number(event.target.value) || 1) }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>No of toilets</Label>
-                <Input
-                  className="bg-white"
-                  min={1}
-                  type="number"
-                  value={draft.toiletCount}
-                  onChange={(event) => setDraft((current) => ({ ...current, toiletCount: Math.max(1, Number(event.target.value) || 1) }))}
-                />
-              </div>
-            </div>
-
             <div className="space-y-4">
-              <div className="text-sm font-semibold text-slate-950">Unit addresses</div>
-              {draft.units.map((unit, index) => (
-                <div key={`unit-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <TextField
-                      label="Unit label"
-                      value={unit.label}
-                      onChange={(value) => updateUnit(index, { label: value })}
-                      placeholder={`Unit ${index + 1}`}
-                    />
-                    <div className="space-y-2">
-                      <Label>State</Label>
-                      <div className="relative">
-                        <Input
-                          className="bg-white"
-                          value={stateQueryByUnit[index] ?? unit.state}
-                          onChange={(event) => {
-                            setStateQueryByUnit((current) => ({ ...current, [index]: event.target.value }));
-                            setShowStateLovByUnit((current) => ({ ...current, [index]: true }));
-                            updateUnit(index, { state: "", city: "", address: "" });
-                            setCityQueryByUnit((current) => ({ ...current, [index]: "" }));
-                          }}
-                          onFocus={() => setShowStateLovByUnit((current) => ({ ...current, [index]: true }))}
-                          placeholder="Type to search states in Nigeria"
-                        />
-                        {showStateLovByUnit[index] ? (
-                          <LovPanel>
-                            {filteredStates(index).map((state) => (
-                              <LovButton key={state} onClick={() => selectState(index, state)}>
-                                <span>{state}</span>
-                                {unit.state === state ? <SelectedPill /> : null}
-                              </LovButton>
-                            ))}
-                          </LovPanel>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>City/Town</Label>
-                      <div className="relative">
-                        <Input
-                          className="bg-white"
-                          value={cityQueryByUnit[index] ?? unit.city}
-                          disabled={!unit.state}
-                          onChange={(event) => {
-                            const nextValue = event.target.value;
-                            setCityQueryByUnit((current) => ({ ...current, [index]: nextValue }));
-                            setShowCityLovByUnit((current) => ({ ...current, [index]: true }));
-                            updateUnit(index, { city: nextValue, address: nextValue === unit.city ? unit.address : "" });
-                          }}
-                          onFocus={() => setShowCityLovByUnit((current) => ({ ...current, [index]: true }))}
-                          placeholder={unit.state ? `Type to search cities in ${unit.state}` : "Select a state first"}
-                        />
-                        {showCityLovByUnit[index] ? (
-                          <LovPanel>
-                            {filteredCities(index).length ? (
-                              filteredCities(index).map((city) => (
-                                <LovButton key={city} onClick={() => selectCity(index, city)}>
-                                  <span>{city}</span>
-                                  {unit.city === city ? <SelectedPill /> : null}
-                                </LovButton>
-                              ))
-                            ) : (
-                              <LovEmpty text="No Nigerian city or town matches that search. Continue typing to use your own city/town." />
-                            )}
-                          </LovPanel>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Address</Label>
-                      <div className="relative">
-                        <Input
-                          className="bg-white"
-                          disabled={!unit.city}
-                          value={unit.address}
-                          onChange={(event) => {
-                            updateUnit(index, { address: event.target.value });
-                            setShowAddressLovByUnit((current) => ({ ...current, [index]: true }));
-                          }}
-                          onFocus={() => setShowAddressLovByUnit((current) => ({ ...current, [index]: true }))}
-                          placeholder={unit.city ? `Start typing an address in ${unit.city}` : "Select a city before entering address"}
-                        />
-                        {showAddressLovByUnit[index] && filteredAddresses(index).length ? (
-                          <LovPanel>
-                            {filteredAddresses(index).map((suggestion) => (
-                              <LovButton key={suggestion.value} onClick={() => selectAddress(index, suggestion.value)}>
-                                <span>{suggestion.value}</span>
-                                <span className="text-xs uppercase tracking-[0.12em] text-slate-400">
-                                  {suggestion.city}, {suggestion.state}
-                                </span>
-                              </LovButton>
-                            ))}
-                          </LovPanel>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">Unit details</p>
+                  <p className="text-sm text-muted-foreground">
+                    Add the units in this same location, for example Ground Floor, First Floor, or Second Floor.
+                  </p>
                 </div>
-              ))}
+                <Button type="button" variant="outline" onClick={addUnit}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add unit
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {draft.units.map((unit, index) => (
+                  <div key={`unit-${index}`} className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">
+                          {index === 0 ? "Primary unit" : `Additional unit ${index + 1}`}
+                        </p>
+                        <p className="text-sm text-muted-foreground">Capture the unit detail and occupancy for this specific space.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => removeUnit(index)}
+                        disabled={draft.units.length === 1}
+                        className="text-slate-500 hover:text-rose-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <NumberField
+                        label="No of rooms"
+                        value={unit.bedroomCount}
+                        onChange={(value) =>
+                          setDraft((current) => ({
+                            ...current,
+                            units: current.units.map((entry, unitIndex) =>
+                              unitIndex === index ? { ...entry, bedroomCount: value } : entry
+                            )
+                          }))
+                        }
+                      />
+                      <NumberField
+                        label="No of bathrooms"
+                        value={unit.bathroomCount}
+                        onChange={(value) =>
+                          setDraft((current) => ({
+                            ...current,
+                            units: current.units.map((entry, unitIndex) =>
+                              unitIndex === index ? { ...entry, bathroomCount: value } : entry
+                            )
+                          }))
+                        }
+                      />
+                      <TextField
+                        label="Unit detail"
+                        value={unit.label}
+                        onChange={(value) => updateUnit(index, value)}
+                        placeholder={index === 0 ? "Ground Floor" : `Unit ${index + 1}`}
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
+                      <div className="space-y-2">
+                        <Label>Occupancy status</Label>
+                        <Select
+                          value={unit.isOccupied ? "OCCUPIED" : "VACANT"}
+                          onValueChange={(value) =>
+                            setDraft((current) => ({
+                              ...current,
+                              units: current.units.map((entry, unitIndex) =>
+                                unitIndex === index
+                                  ? {
+                                      ...entry,
+                                      isOccupied: value === "OCCUPIED",
+                                      currentTenantName: value === "OCCUPIED" ? entry.currentTenantName : "",
+                                      currentTenantEmail: value === "OCCUPIED" ? entry.currentTenantEmail : "",
+                                      currentTenantPhone: value === "OCCUPIED" ? entry.currentTenantPhone : ""
+                                    }
+                                  : entry
+                              )
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Select occupancy status" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white">
+                            <SelectItem value="VACANT">Vacant</SelectItem>
+                            <SelectItem value="OCCUPIED">Occupied</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {unit.isOccupied ? (
+                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+                          <TextField
+                            label="Current tenant name"
+                            value={unit.currentTenantName}
+                            onChange={(value) =>
+                              setDraft((current) => ({
+                                ...current,
+                                units: current.units.map((entry, unitIndex) =>
+                                  unitIndex === index ? { ...entry, currentTenantName: value } : entry
+                                )
+                              }))
+                            }
+                            placeholder="Enter tenant full name"
+                          />
+                          <TextField
+                            label="Current tenant email"
+                            value={unit.currentTenantEmail}
+                            onChange={(value) =>
+                              setDraft((current) => ({
+                                ...current,
+                                units: current.units.map((entry, unitIndex) =>
+                                  unitIndex === index ? { ...entry, currentTenantEmail: value } : entry
+                                )
+                              }))
+                            }
+                            placeholder="Enter tenant email"
+                          />
+                          <TextField
+                            label="Current tenant phone"
+                            value={unit.currentTenantPhone}
+                            onChange={(value) =>
+                              setDraft((current) => ({
+                                ...current,
+                                units: current.units.map((entry, unitIndex) =>
+                                  unitIndex === index ? { ...entry, currentTenantPhone: value } : entry
+                                )
+                              }))
+                            }
+                            placeholder="Enter tenant phone"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <Button onClick={() => void createProperty()} disabled={saving} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
-              {saving ? "Saving..." : "Add property"}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                onClick={() => void createProperty()}
+                disabled={saving}
+                className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+              >
+                {saving ? "Saving..." : "Save property"}
+              </Button>
+              <Button variant="outline" onClick={resetForm} disabled={saving}>
+                Cancel
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      </div>
+      ) : null}
+
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Linked properties</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loading ? <p className="text-sm text-muted-foreground">Loading properties...</p> : null}
+          {!loading && error ? <p className="text-sm text-rose-600">{error}</p> : null}
+          {!loading && !items.length && !error ? (
+            <p className="text-sm text-muted-foreground">No properties linked yet. Use the button above to add your first property.</p>
+          ) : null}
+
+          {items.map((property) => (
+            <div key={property.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)]">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-slate-950">{property.summaryLabel}</p>
+                    <Badge variant="outline">{property.membershipRole}</Badge>
+                    {property.isOccupied ? (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Occupied</Badge>
+                    ) : (
+                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Vacant</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">{property.address}</p>
+                  <p className="text-sm text-slate-500">
+                    {property.city}, {property.state}
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Owner: {property.ownerName} · Landlord email: {property.landlordEmail}
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-sm text-slate-600">
+                  <RowLabel label="Type" value={property.propertyType || "Property"} />
+                  <RowLabel label="Rooms" value={`${property.bedroomCount}`} />
+                  <RowLabel label="Bathrooms" value={`${property.bathroomCount}`} />
+                  <RowLabel
+                    label="Unit details"
+                    value={property.units.map((unit) => unit.label).join(", ") || "Main property"}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  {property.isOccupied ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current tenant</p>
+                      <p className="mt-2 font-medium text-slate-950">{property.currentTenantName || "Tenant linked"}</p>
+                      {property.currentTenantEmail ? <p>{property.currentTenantEmail}</p> : null}
+                      {property.currentTenantPhone ? <p>{property.currentTenantPhone}</p> : null}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+                      No current tenant details attached.
+                    </div>
+                  )}
+
+                  {isLandlord ? (
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <Input
+                        value={shareEmailById[property.id] || ""}
+                        onChange={(event) =>
+                          setShareEmailById((current) => ({ ...current, [property.id]: event.target.value }))
+                        }
+                        placeholder="Share with agent email"
+                        className="bg-white"
+                      />
+                      <Button variant="outline" onClick={() => void shareProperty(property.id)}>
+                        Share
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -556,7 +947,39 @@ function TextField({
   );
 }
 
-function LovPanel({ children }: { children: ReactNode }) {
+function NumberField({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        className="bg-white"
+        type="number"
+        min={1}
+        value={value}
+        onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))}
+      />
+    </div>
+  );
+}
+
+function RowLabel({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-medium text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function LovPanel({ children }: { children: React.ReactNode }) {
   return (
     <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 max-h-64 overflow-y-auto rounded-[1.25rem] border border-slate-200 bg-white p-2 shadow-[0_22px_40px_-26px_rgba(15,23,42,0.35)]">
       {children}
@@ -564,7 +987,7 @@ function LovPanel({ children }: { children: ReactNode }) {
   );
 }
 
-function LovButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+function LovButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"

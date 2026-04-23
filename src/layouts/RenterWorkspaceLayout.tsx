@@ -64,8 +64,9 @@ function RenterWorkspaceShell() {
               {[
                 { label: "Dashboard", to: "/account/renter/dashboard" },
                 { label: "Linked Properties", to: "/account/renter/cases" },
-                { label: "Queue", to: "/account/renter/queue" },
+                { label: "Landlord Decision", to: "/account/renter/queue" },
                 { label: "Payments", to: "/account/renter/payments" },
+                { label: "Buy rent score", to: "/account/renter/buy-score" },
                 { label: "Profile", to: "/account/renter/profile" },
                 { label: "Share score", to: "/account/renter/share-score" }
               ].map((item) => (

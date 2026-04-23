@@ -77,7 +77,7 @@ const scoreSignals: Array<{ label: string; value: string; description: string; i
 
 const adaDemoFacts = [
   { label: "Yearly rent", value: "₦1,250,000" },
-  { label: "Completed leases", value: "2" }
+  { label: "Completed Rent", value: "2" }
 ];
 
 const scoreSteps = [

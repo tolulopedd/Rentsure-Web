@@ -78,6 +78,32 @@ export type PendingRenterInviteItem = {
   createdAt: string;
 };
 
+export type PendingManualRentScorePaymentItem = {
+  id: string;
+  reference: string;
+  amountNgn: number;
+  currency: string;
+  notes?: string | null;
+  createdAt: string;
+  requestedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  renter: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  property: {
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    state: string;
+  };
+};
+
 export type RentScoreBreakdownItem = {
   ruleId: string;
   code: string;
@@ -240,6 +266,19 @@ export function listPendingRenterInvites() {
 export function resendPendingRenterInvite(proposedRenterId: string) {
   return apiFetch<{ success: true; invitePreviewUrl?: string | null }>(
     `/api/admin/renter-invites/${encodeURIComponent(proposedRenterId)}/remind`,
+    {
+      method: "POST"
+    }
+  );
+}
+
+export function listManualRentScorePayments() {
+  return apiFetch<{ items: PendingManualRentScorePaymentItem[] }>("/api/admin/rent-score/payments/manual");
+}
+
+export function confirmManualRentScorePayment(paymentId: string) {
+  return apiFetch<{ success: true }>(
+    `/api/admin/rent-score/payments/manual/${encodeURIComponent(paymentId)}/confirm`,
     {
       method: "POST"
     }

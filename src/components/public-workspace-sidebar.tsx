@@ -13,8 +13,8 @@ function cx(...classes: Array<string | false | null | undefined>) {
 const items = [
   { label: "Dashboard", to: "/account/dashboard", icon: LayoutDashboard },
   { label: "Properties", to: "/account/properties", icon: Building2 },
-  { label: "Queue", to: "/account/queue", icon: ListChecks },
-  { label: "Decisions", to: "/account/decisions", icon: ClipboardCheck },
+  { label: "Link Tenant", to: "/account/queue", icon: ListChecks },
+  { label: "Landlord Decision", to: "/account/decisions", icon: ClipboardCheck },
   { label: "Payments", to: "/account/payments", icon: CreditCard },
   { label: "Profile", to: "/account/profile", icon: UserCircle2 }
 ];
@@ -40,9 +40,6 @@ export function PublicWorkspaceSidebar() {
         <div className="mb-5 rounded-2xl border border-[var(--rentsure-blue-soft)] bg-[var(--rentsure-blue-soft)]/60 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">
             Landlord / agent
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Shared property queue, linked renter reports, and payment tracking in one place.
           </p>
         </div>
 

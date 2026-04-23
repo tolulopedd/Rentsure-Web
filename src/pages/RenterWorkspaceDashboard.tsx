@@ -40,6 +40,32 @@ export default function RenterWorkspaceDashboard() {
         </Card>
       ) : null}
 
+      {data.notifications.length ? (
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Notifications</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {data.notifications.slice(0, 3).map((notification) => (
+              <div key={notification.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-950">{notification.title}</p>
+                    <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.createdAt)}</p>
+                  </div>
+                  {notification.ctaPath ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={notification.ctaPath}>{notification.ctaLabel || "Open"}</Link>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.95fr]">
         <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.18),_transparent_34%),linear-gradient(135deg,#ffffff,#f3f8ff_62%,#edf4ff)] p-6 shadow-sm">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--rentsure-blue)]">Dashboard</p>
@@ -100,13 +126,16 @@ export default function RenterWorkspaceDashboard() {
                 <Link to="/account/renter/share-score">Share rent score</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to="/account/renter/queue">Open queue</Link>
+                <Link to="/account/renter/queue">Landlord decision</Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/account/renter/profile">Update profile</Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/account/renter/payments">Confirm payments</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/account/renter/buy-score">Buy rent score</Link>
               </Button>
             </div>
           </div>
@@ -116,6 +145,7 @@ export default function RenterWorkspaceDashboard() {
           <MiniCard label="Profile completion" value={`${data.summary.profileCompletenessPercent}%`} icon={BadgeCheck} />
           <MiniCard label="Linked rental properties" value={String(data.summary.activeLinkedCases)} icon={Home} />
           <MiniCard label="Pending payment schedules" value={String(data.summary.pendingSchedules)} icon={CreditCard} />
+          <MiniCard label="Unread notifications" value={String(data.summary.unreadNotifications)} icon={Sparkles} />
         </div>
       </div>
 
@@ -206,7 +236,7 @@ export default function RenterWorkspaceDashboard() {
                 {item.decisionNote ? <p className="mt-3 text-sm text-slate-600">{item.decisionNote}</p> : null}
                 <Button asChild variant="ghost" size="sm" className="mt-3 px-0 text-[var(--rentsure-blue)] hover:bg-transparent">
                   <Link to="/account/renter/queue">
-                    Open queue
+                    Landlord decision
                     <ArrowRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>

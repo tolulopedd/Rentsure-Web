@@ -9,10 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { getErrorMessage } from "@/lib/errors";
 import {
+  confirmManualRentScorePayment,
   createRentScoreRule,
   getRentScoreConfig,
+  listManualRentScorePayments,
   updateRentScorePolicy,
   updateRentScoreRule,
+  type PendingManualRentScorePaymentItem,
   type RentScoreConfig
 } from "@/lib/rent-score-api";
 
@@ -81,14 +84,28 @@ const emptyRuleDraft: NewRuleDraft = {
   isActive: true
 };
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString();
+}
+
+function formatNgn(value: number) {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
+}
+
+function renterName(item: PendingManualRentScorePaymentItem["renter"]) {
+  return item.name;
+}
+
 export default function RentScoreAdminPage() {
   const [config, setConfig] = useState<RentScoreConfig | null>(null);
+  const [manualPayments, setManualPayments] = useState<PendingManualRentScorePaymentItem[]>([]);
   const [policyDraft, setPolicyDraft] = useState<PolicyDraft | null>(null);
   const [ruleDrafts, setRuleDrafts] = useState<RuleDraftMap>({});
   const [newRule, setNewRule] = useState<NewRuleDraft>(emptyRuleDraft);
   const [loading, setLoading] = useState(true);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
   const [creatingRule, setCreatingRule] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,13 +113,18 @@ export default function RentScoreAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await getRentScoreConfig();
-      setConfig(response);
-      setPolicyDraft(buildPolicyDraft(response));
-      setRuleDrafts(buildRuleDrafts(response));
+      const [configResponse, manualPaymentResponse] = await Promise.all([
+        getRentScoreConfig(),
+        listManualRentScorePayments()
+      ]);
+      setConfig(configResponse);
+      setPolicyDraft(buildPolicyDraft(configResponse));
+      setRuleDrafts(buildRuleDrafts(configResponse));
+      setManualPayments(manualPaymentResponse.items);
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, "Failed to load rent score configuration"));
       setConfig(null);
+      setManualPayments([]);
     } finally {
       setLoading(false);
     }
@@ -187,6 +209,19 @@ export default function RentScoreAdminPage() {
     }
   }
 
+  async function confirmManualPayment(paymentId: string) {
+    try {
+      setConfirmingPaymentId(paymentId);
+      await confirmManualRentScorePayment(paymentId);
+      setManualPayments((current) => current.filter((payment) => payment.id !== paymentId));
+      toast.success("Manual rent score payment confirmed");
+    } catch (confirmError: unknown) {
+      toast.error(getErrorMessage(confirmError, "Failed to confirm manual payment"));
+    } finally {
+      setConfirmingPaymentId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -208,6 +243,56 @@ export default function RentScoreAdminPage() {
 
       {config && policyDraft ? (
         <>
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Manual transfer payments</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!manualPayments.length ? (
+                <p className="text-sm text-muted-foreground">No manual transfer confirmations are waiting right now.</p>
+              ) : null}
+              {manualPayments.map((payment) => (
+                <div key={payment.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] lg:items-start">
+                    <div className="space-y-2">
+                      <p className="font-semibold text-slate-950">{renterName(payment.renter)}</p>
+                      <p className="text-sm text-slate-600">
+                        {payment.renter.email}
+                      </p>
+                      <p className="text-sm text-slate-600">{payment.property.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {payment.property.address}, {payment.property.city}, {payment.property.state}
+                      </p>
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <p>
+                        <span className="font-medium text-slate-950">Amount:</span> {formatNgn(payment.amountNgn)}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Reference:</span> {payment.reference}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Requested by:</span> {payment.requestedBy.name}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Date:</span> {formatDate(payment.createdAt)}
+                      </p>
+                    </div>
+                    <div className="lg:justify-self-end">
+                      <Button
+                        onClick={() => void confirmManualPayment(payment.id)}
+                        disabled={confirmingPaymentId === payment.id}
+                        className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                      >
+                        {confirmingPaymentId === payment.id ? "Confirming..." : "Confirm transfer"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 lg:grid-cols-4">
             <MetricCard label="Score range" value={`${config.minScore} - ${config.maxScore}`} />
             <MetricCard label="Active rules" value={String(config.rules.filter((rule) => rule.isActive).length)} />

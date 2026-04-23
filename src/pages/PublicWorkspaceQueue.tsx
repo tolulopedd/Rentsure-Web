@@ -11,11 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import {
   createWorkspaceProposedRenter,
+  createRentScorePaymentSession,
   getWorkspaceQueueItem,
   listWorkspaceProperties,
   listWorkspaceQueue,
   searchWorkspaceRenters,
-  requestWorkspaceRentScore,
+  verifyRentScorePayment,
   type QueueDetail,
   type QueueListItem,
   type WorkspaceRenterSearchResult,
@@ -28,6 +29,10 @@ function formatDate(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleDateString();
+}
+
+function formatNgn(value: number) {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
 }
 
 function renterName(item: { firstName: string; lastName: string; organizationName?: string | null }) {
@@ -61,6 +66,8 @@ export default function PublicWorkspaceQueue() {
   const [properties, setProperties] = useState<WorkspaceProperty[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [draft, setDraft] = useState<ProposedDraft>(emptyProposedDraft);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -129,6 +136,26 @@ export default function PublicWorkspaceQueue() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const reference = search.get("rentScorePaymentRef");
+    if (!reference) return;
+
+    void (async () => {
+      try {
+        const response = await verifyRentScorePayment(reference);
+        setDetail(response);
+        await loadQueue(response.id);
+        toast.success("Payment verified. Rent score request created.");
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, "Failed to verify rent score payment"));
+      } finally {
+        const nextUrl = `${window.location.pathname}${window.location.hash || ""}`;
+        window.history.replaceState({}, "", nextUrl);
+      }
+    })();
+  }, [loadQueue]);
+
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
@@ -145,8 +172,13 @@ export default function PublicWorkspaceQueue() {
   );
 
   const propertyOptions = useMemo(
-    () => properties.map((property) => ({ value: property.id, label: `${property.summaryLabel} · ${property.address}` })),
-    [properties]
+    () => {
+      const linkedPropertyIds = new Set(queue.map((item) => item.property.id));
+      return properties
+        .filter((property) => !linkedPropertyIds.has(property.id) || property.id === draft.propertyId)
+        .map((property) => ({ value: property.id, label: `${property.summaryLabel} · ${property.address}` }));
+    },
+    [draft.propertyId, properties, queue]
   );
 
   function resetSearchFlow(nextPropertyId?: string) {
@@ -155,6 +187,7 @@ export default function PublicWorkspaceQueue() {
     setSearchPerformed(false);
     setSearchResults([]);
     setSelectedExistingRenter(null);
+    setInvitePreviewUrl(null);
     setDraft({
       ...emptyProposedDraft,
       propertyId: nextPropertyId ?? draft.propertyId
@@ -207,6 +240,10 @@ export default function PublicWorkspaceQueue() {
       toast.error("Select a property.");
       return;
     }
+    if (queue.some((item) => item.property.id === draft.propertyId)) {
+      toast.error("This property is already linked to a renter.");
+      return;
+    }
     const isExistingMember = Boolean(selectedExistingRenter);
 
     if (!draft.firstName.trim()) {
@@ -244,6 +281,8 @@ export default function PublicWorkspaceQueue() {
       resetSearchFlow(draft.propertyId);
       await loadQueue(response.id);
       setDetail(response);
+      setShowLinkForm(false);
+      setShowPaymentOptions(false);
       toast.success(
         isExistingMember
           ? "Existing renter linked. They can review this request from their RentSure dashboard."
@@ -254,39 +293,60 @@ export default function PublicWorkspaceQueue() {
     }
   }
 
-  async function requestScore() {
+  async function startRentScorePayment(provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER") {
     if (!detail) return;
     try {
-      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
-      setDetail(response);
+      const response = await createRentScorePaymentSession(detail.id, {
+        provider,
+        notes: detail.notes || undefined,
+        callbackPath: window.location.pathname
+      });
+      if (response.checkoutUrl) {
+        window.location.assign(response.checkoutUrl);
+        return;
+      }
+      await loadDetail(detail.id);
       await loadQueue(detail.id);
-      toast.success("Rent score request created");
+      setShowPaymentOptions(false);
+      toast.success("Transfer instructions created. Admin will confirm once payment is received.");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to request rent score"));
+      toast.error(getErrorMessage(error, "Failed to start rent score payment"));
     }
   }
 
+  const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
+  const paymentPending = detail?.latestRentScorePayment && !detail.scoreRequests.length ? detail.latestRentScorePayment : null;
+  const requestButtonLabel = detail?.scoreRequests.length
+    ? "Rent score requested"
+    : paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION"
+      ? "Awaiting admin confirmation"
+      : paymentPending?.status === "PENDING_ACTION"
+        ? "Complete payment"
+        : "Request rent score";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">My renter queue</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Link proposed renter to property and request a rent score and view the history and timeline for your
-          activities.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Link tenant to your property</h1>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowLinkForm((current) => !current)}
+          disabled={!properties.length}
+        >
+          {showLinkForm ? "Close" : "Link property to tenant"}
+        </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
+      {!properties.length ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          No property attached to this profile yet. Add a property before creating a proposed renter case.
+        </div>
+      ) : null}
+
+      {showLinkForm ? (
         <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Add proposed renter</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!properties.length ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                No property attached to this profile yet. Add a property before creating a proposed renter case.
-              </div>
-            ) : null}
+          <CardContent className="space-y-4 pt-6">
             {invitePreviewUrl ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
                 <div className="font-medium text-slate-900">Local invite email preview</div>
@@ -323,10 +383,7 @@ export default function PublicWorkspaceQueue() {
               </Select>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">Search renter</p>
-              <p className="mt-1 text-sm text-slate-600">
-                To start input either email, phone number, first name, or last name of the proposed renter.
-              </p>
+              <p className="text-sm font-semibold text-slate-950">Search</p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <Input
                   value={searchQuery}
@@ -344,7 +401,7 @@ export default function PublicWorkspaceQueue() {
 
             {searchPerformed && searchResults.length ? (
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-950">Existing RentSure renters</p>
+                <p className="text-sm font-semibold text-slate-950">Existing renters</p>
                 {searchResults.map((result) => (
                   <button
                     key={result.id}
@@ -407,15 +464,16 @@ export default function PublicWorkspaceQueue() {
               disabled={!properties.length || (!selectedExistingRenter && (!searchPerformed || Boolean(searchResults.length)))}
               className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
             >
-              Add to queue
+              Add tenant
             </Button>
           </CardContent>
         </Card>
+      ) : null}
 
-        <div className="grid gap-6">
+      <div className="space-y-6">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Queue</CardTitle>
+              <CardTitle className="text-lg">Linked tenants</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {loading ? <p className="text-sm text-muted-foreground">Loading queue...</p> : null}
@@ -428,30 +486,25 @@ export default function PublicWorkspaceQueue() {
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                  className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                     selectedId === item.id
                       ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
                       : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-950">{renterName(item)}</p>
-                      <p className="text-sm text-slate-600">{item.property.summaryLabel}</p>
-                      <p className="text-xs text-muted-foreground">{item.property.address}</p>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] sm:items-center">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
+                      <p className="truncate font-semibold text-slate-950">{item.property.summaryLabel}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
+                      <p className="truncate font-semibold text-slate-950">{renterName(item)}</p>
+                    </div>
+                    <div className="sm:justify-self-end">
                       <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
                         {item.decision?.decision || item.status}
                       </Badge>
-                      {item.linkedRentScore ? (
-                        <p className="mt-2 text-sm font-semibold text-slate-950">
-                          {item.linkedRentScore.score}
-                          <span className="ml-1 text-xs font-medium text-muted-foreground">/ 900</span>
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-xs text-slate-500">Rent score in progress</p>
-                      )}
                     </div>
                   </div>
                 </button>
@@ -461,100 +514,136 @@ export default function PublicWorkspaceQueue() {
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Queue detail</CardTitle>
+              <CardTitle className="text-lg">Property-tenant details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               {detailLoading ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
               {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to manage their record.</p> : null}
               {detail ? (
                 <>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <p className="text-lg font-semibold text-slate-950">{renterName(detail)}</p>
-                        <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
-                        {detail.address ? (
-                          <>
-                            <p className="mt-2 text-sm text-slate-600">{detail.address}</p>
-                            <p className="text-xs text-muted-foreground">{detail.city}, {detail.state}</p>
-                          </>
-                        ) : (
-                          <p className="mt-2 text-sm text-amber-700">Renter profile details are still being provided. Expected within 1-2 days.</p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
-                          {detail.decision?.decision || detail.status}
-                        </Badge>
-                        {detail.linkedRentScore ? (
-                          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                            {detail.linkedRentScore.score}
-                            <span className="ml-1 text-sm font-medium text-muted-foreground">/ 900</span>
-                          </p>
-                        ) : (
-                          <p className="mt-2 text-sm text-slate-500">Rent score review is pending</p>
-                        )}
+                  <div className="rounded-2xl border border-slate-200 bg-white">
+                    <div className="border-b border-slate-200 px-4 py-3">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
+                          <p className="truncate font-semibold text-slate-950">{renterName(detail)}</p>
+                        </div>
+                        <div className="sm:justify-self-end">
+                          <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
+                            {detail.decision?.decision || detail.status}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Property linked</p>
-                    <p className="mt-2 font-semibold text-slate-950">{detail.property.summaryLabel}</p>
-                    <p className="text-sm text-slate-600">{detail.property.address}</p>
-                    <p className="text-xs text-muted-foreground">{detail.property.city}, {detail.property.state}</p>
+                    <div className="divide-y divide-slate-200">
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Contact</p>
+                        <p className="text-sm text-slate-600">
+                          {[detail.email, detail.phone].filter(Boolean).join(" · ") || "Contact details pending"}
+                        </p>
+                      </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter address</p>
+                        {detail.address ? (
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <p>{detail.address}</p>
+                            <p>{detail.city}, {detail.state}</p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-500">Profile details pending</p>
+                        )}
+                      </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Rent score</p>
+                        <p className="text-sm text-slate-600">
+                          {detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
+                        </p>
+                      </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
+                        <p className="text-sm text-slate-600">{detail.property.summaryLabel}</p>
+                      </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property address</p>
+                        <p className="text-sm text-slate-600">{`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`}</p>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
                     <Button
-                      onClick={() => void requestScore()}
-                      disabled={Boolean(detail.scoreRequests.length)}
+                      onClick={() => {
+                        if (paymentPending?.checkoutUrl) {
+                          window.location.assign(paymentPending.checkoutUrl);
+                          return;
+                        }
+                        setShowPaymentOptions((current) => !current);
+                      }}
+                      disabled={!canRequestScore && !paymentPending?.checkoutUrl}
                       className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
                     >
                       <ArrowRight className="mr-2 h-4 w-4" />
-                      {detail.scoreRequests.length ? "Rent score requested" : "Request rent score"}
+                      {requestButtonLabel}
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold text-slate-950">Timeline / audit trail</p>
-                      {!detail.activities.length ? <p className="text-sm text-muted-foreground">No activity yet.</p> : null}
-                      {detail.activities.map((activity) => (
-                        <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-semibold text-slate-950">{activity.message}</p>
-                            <Badge variant="outline">{activity.activityType.replaceAll("_", " ")}</Badge>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {activity.actor ? `${activity.actor.name} · ` : ""}
-                            {formatDate(activity.createdAt)}
-                          </p>
-                        </div>
-                      ))}
+                  {showPaymentOptions && canRequestScore ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-950">Choose payment method</p>
+                      <p className="mt-1 text-sm text-slate-600">Complete payment before the rent score review starts.</p>
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        <Button variant="outline" onClick={() => void startRentScorePayment("PAYSTACK")}>
+                          Paystack
+                        </Button>
+                        <Button variant="outline" onClick={() => void startRentScorePayment("FLUTTERWAVE")}>
+                          Flutterwave
+                        </Button>
+                        <Button variant="outline" onClick={() => void startRentScorePayment("MANUAL_TRANSFER")}>
+                          Cash / transfer
+                        </Button>
+                      </div>
                     </div>
+                  ) : null}
 
-                    <div className="space-y-3">
-                      <p className="text-sm font-semibold text-slate-950">Rent score request history</p>
-                      {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
-                      {detail.scoreRequests.map((request) => (
-                        <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                          <div className="flex items-center justify-between gap-3">
-                            <Badge variant="outline">{request.status}</Badge>
-                            <span className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</span>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-700">Requested by {request.requestedBy.name}</p>
-                          {request.forwardedTo ? <p className="text-sm text-slate-700">Forwarded to {request.forwardedTo.name}</p> : null}
-                          {request.notes ? <p className="mt-1 text-sm text-slate-600">{request.notes}</p> : null}
-                        </div>
-                      ))}
+                  {paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION" && paymentPending.manualTransfer ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-[180px_minmax(0,1fr)]">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Amount</p>
+                        <p>{formatNgn(paymentPending.amountNgn)}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Bank</p>
+                        <p>{paymentPending.manualTransfer.bankName}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Account name</p>
+                        <p>{paymentPending.manualTransfer.accountName}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Account number</p>
+                        <p>{paymentPending.manualTransfer.accountNumber}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Reference</p>
+                        <p>{paymentPending.manualTransfer.reference}</p>
+                      </div>
+                      <p className="mt-3 text-sm text-slate-600">{paymentPending.manualTransfer.instructions}</p>
                     </div>
+                  ) : null}
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
+                    {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
+                    {detail.scoreRequests.map((request) => (
+                      <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <Badge variant="outline">{request.status}</Badge>
+                          <span className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</span>
+                        </div>
+                        <div className="mt-2 space-y-1 text-sm text-slate-600">
+                          <p>Requested by {request.requestedBy.name}</p>
+                          {request.forwardedTo ? <p>Forwarded to {request.forwardedTo.name}</p> : null}
+                          {request.notes ? <p>{request.notes}</p> : null}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </>
               ) : null}
             </CardContent>
           </Card>
-        </div>
       </div>
     </div>
   );

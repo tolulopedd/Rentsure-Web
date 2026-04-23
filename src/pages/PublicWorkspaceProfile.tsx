@@ -195,9 +195,6 @@ export default function PublicWorkspaceProfile() {
           Landlord / agent
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Keep the verified landlord or agent identity current so property records and renter decisions stay traceable.
-        </p>
       </div>
 
       {showOnboarding && onboarding ? (

@@ -26,8 +26,8 @@ export default function RenterWorkspaceQueue() {
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Queue</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Track decision flow for every linked property</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Landlord Decision</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Track landlord decision flow for linked properties</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           Follow rent score requests, landlord or agent decisions, payment schedules, and activity history tied to your profile.
         </p>
@@ -36,10 +36,10 @@ export default function RenterWorkspaceQueue() {
       <div className="grid gap-6 xl:grid-cols-[0.94fr_1.36fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">My queue</CardTitle>
+            <CardTitle className="text-lg">My landlord decisions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No property has been linked into your renter queue yet.</p> : null}
+            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No property has been linked into your renter workspace yet.</p> : null}
             {linkedCases.map((item) => (
               <button
                 key={item.id}
@@ -76,7 +76,7 @@ export default function RenterWorkspaceQueue() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Queue detail</CardTitle>
+            <CardTitle className="text-lg">Decision detail</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedItem ? <p className="text-sm text-muted-foreground">Select a linked property from your queue to continue.</p> : null}

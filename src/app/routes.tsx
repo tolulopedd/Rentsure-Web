@@ -26,6 +26,7 @@ import RenterWorkspaceQueue from "@/pages/RenterWorkspaceQueue";
 import RenterWorkspacePayments from "@/pages/RenterWorkspacePayments";
 import RenterWorkspaceProfile from "@/pages/RenterWorkspaceProfile";
 import RenterWorkspaceShareScore from "@/pages/RenterWorkspaceShareScore";
+import RenterWorkspaceBuyScore from "@/pages/RenterWorkspaceBuyScore";
 import { AccountIndexRedirect, AdminRoute, AppIndexRedirect, PublicWorkspaceRoute, RenterWorkspaceRoute } from "@/app/route-guards";
 
 export const router = createBrowserRouter([
@@ -51,6 +52,7 @@ export const router = createBrowserRouter([
           { path: "cases", element: <RenterWorkspaceCases /> },
           { path: "queue", element: <RenterWorkspaceQueue /> },
           { path: "payments", element: <RenterWorkspacePayments /> },
+          { path: "buy-score", element: <RenterWorkspaceBuyScore /> },
           { path: "profile", element: <RenterWorkspaceProfile /> },
           { path: "share-score", element: <RenterWorkspaceShareScore /> }
         ]

@@ -1,4 +1,4 @@
-import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, Share2, UserCircle2 } from "lucide-react";
+import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, ReceiptText, Share2, UserCircle2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -13,8 +13,9 @@ function cx(...classes: Array<string | false | null | undefined>) {
 const items = [
   { label: "Dashboard", to: "/account/renter/dashboard", icon: LayoutDashboard },
   { label: "Linked Properties", to: "/account/renter/cases", icon: ClipboardList },
-  { label: "Queue", to: "/account/renter/queue", icon: ListChecks },
+  { label: "Landlord Decision", to: "/account/renter/queue", icon: ListChecks },
   { label: "Payments", to: "/account/renter/payments", icon: CreditCard },
+  { label: "Buy rent score", to: "/account/renter/buy-score", icon: ReceiptText },
   { label: "Profile", to: "/account/renter/profile", icon: UserCircle2 },
   { label: "Share score", to: "/account/renter/share-score", icon: Share2 }
 ];

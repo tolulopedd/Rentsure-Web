@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  createSelfInitiatedRenterPayment,
   confirmRenterPayment,
   getRenterDashboard,
+  initiateRenterPaymentConfirmation,
   saveRenterPassportPhoto,
   shareRenterScoreReport,
   updateRenterProfile,
@@ -38,8 +40,30 @@ type RenterWorkspaceContextValue = {
   }) => Promise<boolean>;
   confirmSchedulePayment: (input: {
     paymentScheduleId: string;
+    paidAt?: string;
     receiptReference?: string;
     note?: string;
+  }) => Promise<boolean>;
+  initiateSchedulePaymentConfirmation: (input: {
+    paymentScheduleId: string;
+    receiptReference?: string;
+    note?: string;
+    paymentEvidenceObjectKey?: string;
+    paymentEvidenceFileName?: string;
+    paymentEvidenceMimeType?: string;
+    paymentEvidenceFileSize?: number;
+  }) => Promise<boolean>;
+  initiateDirectPayment: (input: {
+    linkedCaseId: string;
+    paymentType: "RENT" | "UTILITY" | "ESTATE_DUE";
+    amountNgn: number;
+    paidAt?: string;
+    receiptReference?: string;
+    note?: string;
+    paymentEvidenceObjectKey: string;
+    paymentEvidenceFileName: string;
+    paymentEvidenceMimeType: string;
+    paymentEvidenceFileSize: number;
   }) => Promise<boolean>;
   shareScoreReport: (input: {
     recipientEmail: string;
@@ -157,11 +181,13 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
 
   async function confirmSchedulePayment(input: {
     paymentScheduleId: string;
+    paidAt?: string;
     receiptReference?: string;
     note?: string;
   }) {
     try {
       const response = await confirmRenterPayment(input.paymentScheduleId, {
+        paidAt: input.paidAt,
         receiptReference: input.receiptReference,
         note: input.note
       });
@@ -170,6 +196,56 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to confirm payment"));
+      return false;
+    }
+  }
+
+  async function initiateSchedulePaymentConfirmation(input: {
+    paymentScheduleId: string;
+    receiptReference?: string;
+    note?: string;
+    paymentEvidenceObjectKey?: string;
+    paymentEvidenceFileName?: string;
+    paymentEvidenceMimeType?: string;
+    paymentEvidenceFileSize?: number;
+  }) {
+    try {
+      const response = await initiateRenterPaymentConfirmation(input.paymentScheduleId, {
+        receiptReference: input.receiptReference,
+        note: input.note,
+        paymentEvidenceObjectKey: input.paymentEvidenceObjectKey,
+        paymentEvidenceFileName: input.paymentEvidenceFileName,
+        paymentEvidenceMimeType: input.paymentEvidenceMimeType,
+        paymentEvidenceFileSize: input.paymentEvidenceFileSize
+      });
+      setData(response);
+      toast.success("Payment confirmation initiated");
+      return true;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to initiate confirmation"));
+      return false;
+    }
+  }
+
+  async function initiateDirectPayment(input: {
+    linkedCaseId: string;
+    paymentType: "RENT" | "UTILITY" | "ESTATE_DUE";
+    amountNgn: number;
+    paidAt?: string;
+    receiptReference?: string;
+    note?: string;
+    paymentEvidenceObjectKey: string;
+    paymentEvidenceFileName: string;
+    paymentEvidenceMimeType: string;
+    paymentEvidenceFileSize: number;
+  }) {
+    try {
+      const response = await createSelfInitiatedRenterPayment(input);
+      setData(response);
+      toast.success("Payment sent for landlord confirmation");
+      return true;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to submit payment"));
       return false;
     }
   }
@@ -226,6 +302,8 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
         saveProfile,
         verifyIdentityValue,
         confirmSchedulePayment,
+        initiateSchedulePaymentConfirmation,
+        initiateDirectPayment,
         shareScoreReport,
         savePassportPhoto
       }}

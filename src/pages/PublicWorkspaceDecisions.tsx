@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import {
+  createRentScorePaymentSession,
   decideWorkspaceProposedRenter,
   forwardWorkspaceScoreRequest,
   getWorkspaceQueueItem,
   listWorkspaceQueue,
-  requestWorkspaceRentScore,
+  verifyRentScorePayment,
   type ProposedRenterDecision,
   type QueueDetail,
   type QueueListItem
@@ -41,6 +42,22 @@ function decisionBadgeClass(decision?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function decisionLabel(decision?: string | null) {
+  if (decision === "HOLD") return "Request for additional information";
+  if (decision === "APPROVED") return "Approved";
+  if (decision === "DECLINED") return "Declined";
+  return decision || "Pending";
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+      <span className="text-slate-500">{label}</span>
+      <span className="text-right font-medium text-slate-900">{value}</span>
+    </div>
+  );
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -55,6 +72,7 @@ export default function PublicWorkspaceDecisions() {
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -116,6 +134,27 @@ export default function PublicWorkspaceDecisions() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const reference = search.get("rentScorePaymentRef");
+    if (!reference) return;
+
+    void (async () => {
+      try {
+        const response = await verifyRentScorePayment(reference);
+        setDetail(response);
+        setDecisionNote(response.decision?.note || "");
+        await loadQueue(response.id);
+        toast.success("Payment verified. Rent score request created.");
+      } catch (error: unknown) {
+        toast.error(getErrorMessage(error, "Failed to verify rent score payment"));
+      } finally {
+        const nextUrl = `${window.location.pathname}${window.location.hash || ""}`;
+        window.history.replaceState({}, "", nextUrl);
+      }
+    })();
+  }, [loadQueue]);
+
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
@@ -131,15 +170,24 @@ export default function PublicWorkspaceDecisions() {
     }
   );
 
-  async function requestScore() {
+  async function startRentScorePayment(provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER") {
     if (!detail) return;
     try {
-      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
-      setDetail(response);
+      const response = await createRentScorePaymentSession(detail.id, {
+        provider,
+        notes: detail.notes || undefined,
+        callbackPath: window.location.pathname
+      });
+      if (response.checkoutUrl) {
+        window.location.assign(response.checkoutUrl);
+        return;
+      }
+      await loadDetail(detail.id);
       await loadQueue(detail.id);
-      toast.success("Rent score request created");
+      setShowPaymentOptions(false);
+      toast.success("Transfer instructions created. Admin will confirm once payment is received.");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to request rent score"));
+      toast.error(getErrorMessage(error, "Failed to start rent score payment"));
     }
   }
 
@@ -165,7 +213,7 @@ export default function PublicWorkspaceDecisions() {
       setDetail(response);
       setDecisionNote(response.decision?.note || "");
       await loadQueue(detail.id);
-      toast.success(`Renter marked as ${decision.toLowerCase()}`);
+      toast.success(`Renter marked as ${decisionLabel(decision).toLowerCase()}`);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to save landlord decision"));
     }
@@ -174,7 +222,7 @@ export default function PublicWorkspaceDecisions() {
   function downloadReport() {
     if (!detail || !detail.linkedRentScoreReport) return;
     const renter = renterName(detail);
-    const decisionLabel = detail.decision?.decision || "PENDING";
+    const currentDecisionLabel = decisionLabel(detail.decision?.decision);
     const html = `
       <!DOCTYPE html>
       <html>
@@ -200,7 +248,7 @@ export default function PublicWorkspaceDecisions() {
             <p><strong>Proposed renter:</strong> ${escapeHtml(renter)}</p>
             <p><strong>Property:</strong> ${escapeHtml(detail.property.summaryLabel)}</p>
             <p><strong>Property address:</strong> ${escapeHtml(detail.property.address)}, ${escapeHtml(detail.property.city)}, ${escapeHtml(detail.property.state)}</p>
-            <p><strong>Landlord decision:</strong> ${escapeHtml(decisionLabel)}</p>
+            <p><strong>Landlord decision:</strong> ${escapeHtml(currentDecisionLabel)}</p>
           </div>
           <div class="meta">
             <div class="card">
@@ -211,7 +259,7 @@ export default function PublicWorkspaceDecisions() {
             </div>
             <div class="card">
               <h3>Decision details</h3>
-              <p><strong>Status:</strong> ${escapeHtml(detail.status)}</p>
+            <p><strong>Status:</strong> ${escapeHtml(decisionLabel(detail.status))}</p>
               <p><strong>Decision note:</strong> ${escapeHtml(detail.decision?.note || "No note added")}</p>
               <p><strong>Generated:</strong> ${escapeHtml(new Date().toLocaleString())}</p>
             </div>
@@ -274,210 +322,259 @@ export default function PublicWorkspaceDecisions() {
     URL.revokeObjectURL(url);
   }
 
+  const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
+  const paymentPending = detail?.latestRentScorePayment && !detail.scoreRequests.length ? detail.latestRentScorePayment : null;
+  const requestButtonLabel = detail?.scoreRequests.length
+    ? "Rent score requested"
+    : paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION"
+      ? "Awaiting admin confirmation"
+      : paymentPending?.status === "PENDING_ACTION"
+        ? "Complete payment"
+        : "Request rent score";
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Landlord decision</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Review rent score outcomes, forward reports, and take approval, hold, or decline decisions.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Landlord Decision</h1>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.4fr]">
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Decision queue</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? <p className="text-sm text-muted-foreground">Loading decision queue...</p> : null}
-            {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters available yet.</p> : null}
-            {queue.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
-                  selectedId === item.id
-                    ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-950">{renterName(item)}</p>
-                    <p className="text-sm text-slate-600">{item.property.summaryLabel}</p>
-                    <p className="text-xs text-muted-foreground">{item.property.address}</p>
-                  </div>
-                  <div className="text-right">
-                    <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
-                      {item.decision?.decision || item.status}
-                    </Badge>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {item.linkedRentScore ? `${item.linkedRentScore.score} / 900` : "Rent score in progress"}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Decision detail</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {detailLoading ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
-            {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to continue.</p> : null}
-            {detail ? (
-              <>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold text-slate-950">{renterName(detail)}</p>
-                      <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
-                      <p className="mt-2 text-sm text-slate-600">{detail.property.summaryLabel}</p>
-                      <p className="text-xs text-muted-foreground">{detail.property.address}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
-                        {detail.decision?.decision || detail.status}
-                      </Badge>
-                      {detail.linkedRentScore ? (
-                        <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                          {detail.linkedRentScore.score}
-                          <span className="ml-1 text-sm font-medium text-muted-foreground">/ 900</span>
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-500">Rent score review is pending</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => void requestScore()}
-                    disabled={Boolean(detail.scoreRequests.length)}
-                    className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
-                  >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    {detail.scoreRequests.length ? "Rent score requested" : "Request rent score"}
-                  </Button>
-                  {isAgent ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => void forwardScoreRequest()}
-                      disabled={!detail.scoreRequests.length || detail.scoreRequests[0]?.status === "FORWARDED"}
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      {detail.scoreRequests[0]?.status === "FORWARDED" ? "Forwarded to landlord" : "Forward report to landlord"}
-                    </Button>
-                  ) : null}
-                  <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download report
-                  </Button>
-                </div>
-
-                {detail.decision ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Current landlord decision</p>
-                    <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-950">{detail.decision.decision}</p>
-                        <p className="text-sm text-slate-600">
-                          {detail.decision.decidedBy?.name ? `By ${detail.decision.decidedBy.name}` : "Decision maker not captured"}
-                          {detail.decision.decidedAt ? ` on ${formatDate(detail.decision.decidedAt)}` : ""}
-                        </p>
+      <div className="space-y-6">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Linked tenants</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loading ? <p className="text-sm text-muted-foreground">Loading decision queue...</p> : null}
+              {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters available yet.</p> : null}
+              {queue.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedId(item.id)}
+                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                    selectedId === item.id
+                      ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                    <div className="space-y-2">
+                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
+                          <p className="font-semibold text-slate-950">{item.property.summaryLabel}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
+                          <p className="font-semibold text-slate-950">{renterName(item)}</p>
+                        </div>
+                        <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
+                          {decisionLabel(item.decision?.decision || item.status)}
+                        </Badge>
                       </div>
-                      {detail.decision.note ? <p className="max-w-xl text-sm text-slate-600">{detail.decision.note}</p> : null}
                     </div>
-                  </div>
-                ) : null}
-
-                {isLandlord ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-950">Landlord decision</p>
-                    {!detail.linkedRentScoreReport ? (
-                      <p className="mt-2 text-sm text-slate-500">
-                        Decision actions unlock once the rent score report is ready.
-                      </p>
-                    ) : null}
-                    <div className="mt-3 space-y-2">
-                      <Label>Decision note</Label>
-                      <Textarea
-                        value={decisionNote}
-                        onChange={(event) => setDecisionNote(event.target.value)}
-                        placeholder="Why are you approving, holding, or declining this renter?"
-                        className="bg-white"
-                        disabled={!detail.linkedRentScoreReport}
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <SummaryRow
+                        label="Rent score"
+                        value={item.linkedRentScore ? `${item.linkedRentScore.score} / 900` : "In progress"}
                       />
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <Button
-                        onClick={() => void takeDecision("APPROVED")}
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                        disabled={!detail.linkedRentScoreReport}
-                      >
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button variant="outline" onClick={() => void takeDecision("HOLD")} disabled={!detail.linkedRentScoreReport}>
-                        <PauseCircle className="mr-2 h-4 w-4" />
-                        Hold
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="border-rose-200 text-rose-700 hover:bg-rose-50"
-                        onClick={() => void takeDecision("DECLINED")}
-                        disabled={!detail.linkedRentScoreReport}
-                      >
-                        <ShieldX className="mr-2 h-4 w-4" />
-                        Decline
-                      </Button>
+                      <SummaryRow label="Decision" value={decisionLabel(item.decision?.decision || item.status)} />
                     </div>
                   </div>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Decision details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {detailLoading ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
+              {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to continue.</p> : null}
+                {detail ? (
+                  <>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-semibold text-slate-950">{renterName(detail)}</p>
+                          <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
+                            {decisionLabel(detail.decision?.decision || detail.status)}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2 text-sm text-slate-600">
+                          <SummaryRow label="Email" value={detail.email} />
+                          <SummaryRow label="Phone" value={detail.phone} />
+                          <SummaryRow label="Property" value={detail.property.summaryLabel} />
+                          <SummaryRow label="Address" value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`} />
+                          <SummaryRow
+                            label="Rent score"
+                            value={detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          onClick={() => {
+                            if (paymentPending?.checkoutUrl) {
+                              window.location.assign(paymentPending.checkoutUrl);
+                              return;
+                            }
+                            setShowPaymentOptions((current) => !current);
+                          }}
+                          disabled={!canRequestScore && !paymentPending?.checkoutUrl}
+                          className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                        >
+                          <ArrowRight className="mr-2 h-4 w-4" />
+                          {requestButtonLabel}
+                        </Button>
+                        {isAgent ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => void forwardScoreRequest()}
+                            disabled={!detail.scoreRequests.length || detail.scoreRequests[0]?.status === "FORWARDED"}
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            {detail.scoreRequests[0]?.status === "FORWARDED" ? "Forwarded to landlord" : "Forward report to landlord"}
+                          </Button>
+                        ) : null}
+                        <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport || !detail.decision}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download report
+                        </Button>
+                      </div>
+                      {showPaymentOptions && canRequestScore ? (
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-semibold text-slate-950">Choose payment method</p>
+                          <p className="mt-1 text-sm text-slate-600">Complete payment before the rent score review starts.</p>
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <Button variant="outline" onClick={() => void startRentScorePayment("PAYSTACK")}>
+                              Paystack
+                            </Button>
+                            <Button variant="outline" onClick={() => void startRentScorePayment("FLUTTERWAVE")}>
+                              Flutterwave
+                            </Button>
+                            <Button variant="outline" onClick={() => void startRentScorePayment("MANUAL_TRANSFER")}>
+                              Cash / transfer
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                      {paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION" && paymentPending.manualTransfer ? (
+                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                          <div className="space-y-2 text-sm text-slate-700">
+                            <SummaryRow label="Amount" value={formatNgn(paymentPending.amountNgn)} />
+                            <SummaryRow label="Bank" value={paymentPending.manualTransfer.bankName} />
+                            <SummaryRow label="Account name" value={paymentPending.manualTransfer.accountName} />
+                            <SummaryRow label="Account number" value={paymentPending.manualTransfer.accountNumber} />
+                            <SummaryRow label="Reference" value={paymentPending.manualTransfer.reference} />
+                          </div>
+                          <p className="mt-3 text-sm text-slate-600">{paymentPending.manualTransfer.instructions}</p>
+                        </div>
+                      ) : null}
+                      {!detail.decision ? (
+                        <p className="mt-3 text-sm text-slate-500">Download report unlocks after a landlord decision is made.</p>
+                      ) : null}
+                    </div>
+
+                    {detail.decision ? (
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <div className="space-y-2 text-sm text-slate-600">
+                          <SummaryRow label="Decision" value={detail.decision.decision} />
+                          <SummaryRow
+                            label="By"
+                            value={detail.decision.decidedBy?.name || "Decision maker not captured"}
+                          />
+                          <SummaryRow
+                            label="Date"
+                            value={detail.decision.decidedAt ? formatDate(detail.decision.decidedAt) : "-"}
+                          />
+                          <SummaryRow label="Note" value={detail.decision.note || "No note added."} />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {isLandlord ? (
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        {!detail.linkedRentScoreReport ? (
+                          <p className="text-sm text-slate-500">
+                            Decision actions unlock once the rent score report is ready.
+                          </p>
+                        ) : null}
+                        <div className="space-y-2">
+                          <Label>Decision note</Label>
+                          <Textarea
+                            value={decisionNote}
+                            onChange={(event) => setDecisionNote(event.target.value)}
+                            placeholder="Why are you approving, holding, or declining this renter?"
+                            className="bg-white"
+                            disabled={!detail.linkedRentScoreReport}
+                          />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Button
+                            onClick={() => void takeDecision("APPROVED")}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            disabled={!detail.linkedRentScoreReport}
+                          >
+                            <ShieldCheck className="mr-2 h-4 w-4" />
+                            Approve
+                          </Button>
+                          <Button variant="outline" onClick={() => void takeDecision("HOLD")} disabled={!detail.linkedRentScoreReport}>
+                            <PauseCircle className="mr-2 h-4 w-4" />
+                            Request for additional information
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                            onClick={() => void takeDecision("DECLINED")}
+                            disabled={!detail.linkedRentScoreReport}
+                          >
+                            <ShieldX className="mr-2 h-4 w-4" />
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-slate-950">Recent activity</p>
+                        {!detail.activities.length ? <p className="text-sm text-muted-foreground">No activity yet.</p> : null}
+                        {detail.activities.slice(0, 3).map((activity) => (
+                          <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                            <div className="space-y-2 text-sm text-slate-600">
+                              <SummaryRow label="Activity" value={activity.activityType.replaceAll("_", " ")} />
+                              <SummaryRow label="Message" value={activity.message} />
+                              <SummaryRow label="Date" value={formatDate(activity.createdAt)} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
+                        {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
+                        {detail.scoreRequests.slice(0, 3).map((request) => (
+                          <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                            <div className="space-y-2 text-sm text-slate-600">
+                              <SummaryRow label="Status" value={request.status} />
+                              <SummaryRow label="Requested by" value={request.requestedBy.name} />
+                              <SummaryRow label="Date" value={formatDate(request.createdAt)} />
+                              {request.forwardedTo ? <SummaryRow label="Forwarded to" value={request.forwardedTo.name} /> : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 ) : null}
-
-                <div className="space-y-4">
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-slate-950">Timeline / audit trail</p>
-                    {!detail.activities.length ? <p className="text-sm text-muted-foreground">No activity yet.</p> : null}
-                    {detail.activities.map((activity) => (
-                      <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-950">{activity.message}</p>
-                          <Badge variant="outline">{activity.activityType.replaceAll("_", " ")}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {activity.actor ? `${activity.actor.name} · ` : ""}
-                          {formatDate(activity.createdAt)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-slate-950">Rent score request history</p>
-                    {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
-                    {detail.scoreRequests.map((request) => (
-                      <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-                        <div className="flex items-center justify-between gap-3">
-                          <Badge variant="outline">{request.status}</Badge>
-                          <span className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</span>
-                        </div>
-                        <p className="mt-1 text-sm text-slate-700">Requested by {request.requestedBy.name}</p>
-                        {request.forwardedTo ? <p className="text-sm text-slate-700">Forwarded to {request.forwardedTo.name}</p> : null}
-                        {request.notes ? <p className="mt-2 text-sm text-slate-600">{request.notes}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
       </div>
     </div>
   );

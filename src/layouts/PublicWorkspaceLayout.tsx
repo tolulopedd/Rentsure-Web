@@ -22,8 +22,8 @@ export function PublicWorkspaceLayout() {
               {[
                 { label: "Dashboard", to: "/account/dashboard" },
                 { label: "Properties", to: "/account/properties" },
-                { label: "Queue", to: "/account/queue" },
-                { label: "Decisions", to: "/account/decisions" },
+                { label: "Link Tenant", to: "/account/queue" },
+                { label: "Landlord Decision", to: "/account/decisions" },
                 { label: "Payments", to: "/account/payments" },
                 { label: "Profile", to: "/account/profile" }
               ].map((item) => (

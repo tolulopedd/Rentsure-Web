@@ -60,11 +60,7 @@ export default function PublicWorkspaceDashboard() {
     <div className="space-y-6">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Dashboard</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Decision point</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Use this shared workspace to view all linked properties, submit proposed renters for rent score review,
-          forward reports between agent and landlord, and log payment schedules tied to each renter.
-        </p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Dashboard</h1>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -100,7 +96,7 @@ export default function PublicWorkspaceDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Sparkles className="h-4 w-4 text-[var(--rentsure-blue)]" />
-              Recent proposed renters
+              Recent tenants
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

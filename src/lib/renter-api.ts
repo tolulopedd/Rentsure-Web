@@ -62,7 +62,18 @@ export type RenterDashboardResponse = {
     activeLinkedCases: number;
     pendingSchedules: number;
     profileCompletenessPercent: number;
+    unreadNotifications: number;
   };
+  notifications: Array<{
+    id: string;
+    notificationType: "PROPERTY_LINKED";
+    title: string;
+    message: string;
+    ctaLabel?: string | null;
+    ctaPath?: string | null;
+    readAt?: string | null;
+    createdAt: string;
+  }>;
   shareHistory: Array<{
     id: string;
     recipientEmail: string;
@@ -74,6 +85,25 @@ export type RenterDashboardResponse = {
     maxScore: number;
     scoreBand: "STRONG" | "STABLE" | "WATCH" | "RISK";
     createdAt: string;
+  }>;
+  rentScorePurchases: Array<{
+    id: string;
+    provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
+    status: "PENDING" | "PENDING_ACTION" | "AWAITING_MANUAL_CONFIRMATION" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+    amountNgn: number;
+    currency: string;
+    reference: string;
+    checkoutUrl?: string | null;
+    createdAt: string;
+    paidAt?: string | null;
+    verifiedAt?: string | null;
+    manualTransfer?: {
+      bankName?: string;
+      accountName?: string;
+      accountNumber?: string;
+      reference?: string;
+      instructions?: string;
+    } | null;
   }>;
   linkedCases: Array<{
     id: string;
@@ -102,6 +132,15 @@ export type RenterDashboardResponse = {
       status: "PENDING" | "PAID" | "OVERDUE";
       note?: string | null;
       confirmedByRenterAt?: string | null;
+      confirmationInitiatedAt?: string | null;
+      confirmedAt?: string | null;
+      confirmationTiming?: "ON_TIME" | "LATE" | null;
+      paymentEvidenceObjectKey?: string | null;
+      paymentEvidenceFileName?: string | null;
+      paymentEvidenceMimeType?: string | null;
+      paymentEvidenceFileSize?: number | null;
+      paymentEvidenceUploadedAt?: string | null;
+      paymentEvidenceViewUrl?: string | null;
       receiptReference?: string | null;
       createdBy: string;
     }>;
@@ -161,11 +200,47 @@ export function verifyRenterIdentity(input: {
 export function confirmRenterPayment(
   paymentScheduleId: string,
   input: {
+    paidAt?: string;
     receiptReference?: string;
     note?: string;
   }
 ) {
   return apiFetch<RenterDashboardResponse>(`/api/renter/payment-schedules/${encodeURIComponent(paymentScheduleId)}/confirm`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function initiateRenterPaymentConfirmation(
+  paymentScheduleId: string,
+  input: {
+    receiptReference?: string;
+    note?: string;
+    paymentEvidenceObjectKey?: string;
+    paymentEvidenceFileName?: string;
+    paymentEvidenceMimeType?: string;
+    paymentEvidenceFileSize?: number;
+  }
+) {
+  return apiFetch<RenterDashboardResponse>(`/api/renter/payment-schedules/${encodeURIComponent(paymentScheduleId)}/initiate`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function createSelfInitiatedRenterPayment(input: {
+  linkedCaseId: string;
+  paymentType: "RENT" | "UTILITY" | "ESTATE_DUE";
+  amountNgn: number;
+  paidAt?: string;
+  receiptReference?: string;
+  note?: string;
+  paymentEvidenceObjectKey: string;
+  paymentEvidenceFileName: string;
+  paymentEvidenceMimeType: string;
+  paymentEvidenceFileSize: number;
+}) {
+  return apiFetch<RenterDashboardResponse>("/api/renter/payment-schedules/initiate-self", {
     method: "POST",
     body: JSON.stringify(input)
   });
@@ -182,6 +257,38 @@ export function shareRenterScoreReport(input: {
   return apiFetch<{ dashboard: RenterDashboardResponse; sharePreviewUrl?: string | null }>("/api/renter/share-report", {
     method: "POST",
     body: JSON.stringify(input)
+  });
+}
+
+export function createRenterRentScorePaymentSession(input: {
+  provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
+  callbackPath?: string;
+}) {
+  return apiFetch<{
+    paymentId: string;
+    provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
+    status: "PENDING" | "PENDING_ACTION" | "AWAITING_MANUAL_CONFIRMATION" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+    amountNgn: number;
+    currency: string;
+    reference: string;
+    checkoutUrl?: string | null;
+    manualTransfer?: {
+      bankName: string;
+      accountName: string;
+      accountNumber: string;
+      reference: string;
+      instructions: string;
+    } | null;
+  }>("/api/renter/rent-score/payments", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function verifyRenterRentScorePayment(reference: string) {
+  return apiFetch<{ success: true }>("/api/renter/rent-score/payments/verify", {
+    method: "POST",
+    body: JSON.stringify({ reference })
   });
 }
 
