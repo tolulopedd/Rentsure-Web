@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -15,10 +15,16 @@ type ResetPasswordResponse = {
   success: boolean;
   email: string;
   resetEmailPreviewUrl?: string | null;
+  resetLinkPreviewUrl?: string | null;
 };
 
 export default function ResetPassword() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const isTokenFlow = Boolean(token);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResetPasswordResponse | null>(null);
@@ -31,22 +37,40 @@ export default function ResetPassword() {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!email.trim()) {
-      toast.error("Enter your email address.");
-      return;
-    }
-
     setLoading(true);
     try {
-      const response = await publicFetch<ResetPasswordResponse>("/api/auth/request-password-reset", {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim() })
-      });
-      setResult(response);
-      setSubmitted(true);
-      toast.success("Reset request captured");
+      if (isTokenFlow) {
+        if (!password.trim()) {
+          toast.error("Enter a new password.");
+          return;
+        }
+        if (password !== confirmPassword) {
+          toast.error("Passwords do not match.");
+          return;
+        }
+
+        await publicFetch<{ success: boolean }>("/api/auth/reset-password", {
+          method: "POST",
+          body: JSON.stringify({ token, password })
+        });
+        setSubmitted(true);
+        toast.success("Password reset complete");
+      } else {
+        if (!email.trim()) {
+          toast.error("Enter your email address.");
+          return;
+        }
+
+        const response = await publicFetch<ResetPasswordResponse>("/api/auth/request-password-reset", {
+          method: "POST",
+          body: JSON.stringify({ email: email.trim() })
+        });
+        setResult(response);
+        setSubmitted(true);
+        toast.success("Reset link sent");
+      }
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Unable to process reset request."));
+      toast.error(getErrorMessage(error, isTokenFlow ? "Unable to reset password." : "Unable to process reset request."));
     } finally {
       setLoading(false);
     }
@@ -71,13 +95,21 @@ export default function ResetPassword() {
               <div className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-emerald-700">
                   <MailCheck className="h-4 w-4" />
-                  Request received
+                  {isTokenFlow ? "Password updated" : "Request received"}
                 </div>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  A reset request for <span className="font-medium text-slate-900">{email}</span> has been captured.
-                  Check your email preview below in this environment.
+                  {isTokenFlow ? (
+                    <>
+                      Your password has been updated successfully. You can return to sign in with your new password.
+                    </>
+                  ) : (
+                    <>
+                      If the email exists in RentSure, we have sent a password reset link to{" "}
+                      <span className="font-medium text-slate-900">{email}</span>.
+                    </>
+                  )}
                 </p>
-                {result?.resetEmailPreviewUrl ? (
+                {!isTokenFlow && result?.resetEmailPreviewUrl ? (
                   <div className="mt-4 rounded-2xl border border-emerald-200 bg-white/80 p-4 text-sm text-slate-700">
                     <div className="font-medium text-slate-900">Local email preview</div>
                     <a
@@ -88,17 +120,29 @@ export default function ResetPassword() {
                     >
                       {result.resetEmailPreviewUrl}
                     </a>
+                    {result.resetLinkPreviewUrl ? (
+                      <a
+                        className="mt-3 block break-all text-[var(--rentsure-blue)] hover:underline"
+                        href={result.resetLinkPreviewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {result.resetLinkPreviewUrl}
+                      </a>
+                    ) : null}
                   </div>
                 ) : null}
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    onClick={() => {
-                      setSubmitted(false);
-                      setResult(null);
-                    }}
-                  >
-                    Change email
-                  </Button>
+                  {!isTokenFlow ? (
+                    <Button
+                      onClick={() => {
+                        setSubmitted(false);
+                        setResult(null);
+                      }}
+                    >
+                      Change email
+                    </Button>
+                  ) : null}
                   <Button asChild variant="outline">
                     <Link to="/login">Back to sign in</Link>
                   </Button>
@@ -106,21 +150,53 @@ export default function ResetPassword() {
               </div>
             ) : (
               <form className="space-y-4" onSubmit={onSubmit}>
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input
-                    id="reset-email"
-                    autoComplete="email"
-                    className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="Enter email address"
-                    type="email"
-                    value={email}
-                  />
-                </div>
+                {isTokenFlow ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-password">New password</Label>
+                      <Input
+                        id="reset-password"
+                        autoComplete="new-password"
+                        className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Enter new password"
+                        type="password"
+                        value={password}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirm password</Label>
+                      <Input
+                        id="confirm-password"
+                        autoComplete="new-password"
+                        className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Confirm new password"
+                        type="password"
+                        value={confirmPassword}
+                      />
+                    </div>
+                    <p className="text-xs leading-5 text-slate-500">
+                      Use at least 10 characters with uppercase, lowercase, number, and special character.
+                    </p>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      autoComplete="email"
+                      className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="Enter email address"
+                      type="email"
+                      value={email}
+                    />
+                  </div>
+                )}
 
                 <Button className="w-full" disabled={loading} type="submit">
-                  {loading ? "Submitting..." : "Send reset link"}
+                  {loading ? "Submitting..." : isTokenFlow ? "Reset password" : "Send reset link"}
                 </Button>
               </form>
             )}
