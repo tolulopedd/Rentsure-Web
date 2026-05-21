@@ -53,6 +53,7 @@ export default function RenterWorkspaceBuyScore() {
   }, [refresh]);
 
   const latestPurchase = useMemo(() => data?.rentScorePurchases[0] || null, [data]);
+  const reportReady = Boolean(data?.reportAccess.canShareOrDownload);
   const purchaseInProgress =
     latestPurchase?.status === "PENDING_ACTION" || latestPurchase?.status === "AWAITING_MANUAL_CONFIRMATION"
       ? latestPurchase
@@ -173,11 +174,17 @@ export default function RenterWorkspaceBuyScore() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-              <Button variant="outline" onClick={downloadCurrentSnapshot}>
+              <Button variant="outline" onClick={downloadCurrentSnapshot} disabled={!reportReady}>
                 <Download className="mr-2 h-4 w-4" />
                 Download snapshot
               </Button>
             </div>
+
+            {!reportReady && latestPurchase?.status === "SUCCEEDED" ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Your rent score report will be available after admin approval.
+              </div>
+            ) : null}
 
             {showPaymentOptions && !purchaseInProgress ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4">

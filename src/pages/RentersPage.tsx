@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Send, ShieldCheck, Trash2 } from "lucide-react";
+import { Search, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,12 +14,9 @@ import {
   deleteRentScoreEvent,
   getRentScoreConfig,
   getRenterScoreDetails,
-  listPendingRenterInvites,
   listRenterScores,
   recordRentScoreEvent,
-  resendPendingRenterInvite,
   type PublicAccountStatus,
-  type PendingRenterInviteItem,
   type RentScoreBand,
   type RentScoreConfig,
   type RenterScoreListItem,
@@ -79,7 +76,6 @@ export default function RentersPage() {
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<RenterScoreSnapshot | null>(null);
   const [config, setConfig] = useState<RentScoreConfig | null>(null);
-  const [pendingInvites, setPendingInvites] = useState<PendingRenterInviteItem[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<PublicAccountStatus | "ALL">("ALL");
   const [eventDraft, setEventDraft] = useState<EventDraft>(emptyEventDraft);
@@ -87,20 +83,17 @@ export default function RentersPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [invitePreviewById, setInvitePreviewById] = useState<Record<string, string>>({});
 
   async function loadList(activeSelectedId?: string) {
     try {
       setLoadingList(true);
       setError(null);
-      const [listResponse, policy, inviteResponse] = await Promise.all([
+      const [listResponse, policy] = await Promise.all([
         listRenterScores({ q: query.trim() || undefined, status }),
-        getRentScoreConfig(),
-        listPendingRenterInvites()
+        getRentScoreConfig()
       ]);
       setItems(listResponse.items);
       setConfig(policy);
-      setPendingInvites(inviteResponse.items);
 
       const nextSelectedId =
         activeSelectedId && listResponse.items.some((item) => item.accountId === activeSelectedId)
@@ -110,7 +103,6 @@ export default function RentersPage() {
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, "Failed to load renter score queue"));
       setItems([]);
-      setPendingInvites([]);
       setSelectedId("");
     } finally {
       setLoadingList(false);
@@ -194,29 +186,13 @@ export default function RentersPage() {
     }
   }
 
-  async function sendInviteReminder(proposedRenterId: string) {
-    try {
-      const response = await resendPendingRenterInvite(proposedRenterId);
-      if (response.invitePreviewUrl) {
-        setInvitePreviewById((current) => ({
-          ...current,
-          [proposedRenterId]: response.invitePreviewUrl as string
-        }));
-      }
-      await loadList(selectedId);
-      toast.success(response.invitePreviewUrl ? "Reminder logged and preview link refreshed" : "Reminder logged");
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to send renter reminder"));
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Renter review queue</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Renter scores</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Review live renter profiles, inspect their score logic, and add verified score events.
+            Review renter score profiles, inspect scoring logic, and record verified score events.
           </p>
         </div>
         <Badge className="w-fit border border-[var(--rentsure-blue-soft)] bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
@@ -522,59 +498,6 @@ export default function RentersPage() {
         </div>
       </div>
 
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-lg">Pending renter invites</CardTitle>
-            <Badge variant="outline">{pendingInvites.length} pending</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Renters captured from landlord or agent queues stay visible here until they join or complete verification.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!pendingInvites.length ? <p className="text-sm text-muted-foreground">No pending renter invites right now.</p> : null}
-          {pendingInvites.map((invite) => (
-            <div key={invite.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-slate-950">{renterDisplayName(invite)}</p>
-                    <Badge variant="outline">{invite.inviteState === "UNVERIFIED_ACCOUNT" ? "Unverified account" : "Invited renter"}</Badge>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600">{invite.email} · {invite.phone}</p>
-                  <p className="text-sm text-slate-600">{invite.property.summaryLabel}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {invite.property.address}, {invite.property.city}, {invite.property.state}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Added by {invite.requestedBy.name} on {formatDate(invite.createdAt)}
-                    {invite.lastReminderAt ? ` · Last reminder ${formatDate(invite.lastReminderAt)}` : ""}
-                  </p>
-                </div>
-
-                <Button variant="outline" onClick={() => void sendInviteReminder(invite.id)}>
-                  <Send className="mr-2 h-4 w-4" />
-                  Send reminder
-                </Button>
-              </div>
-              {invitePreviewById[invite.id] ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                  <div className="font-medium text-slate-900">Local email preview</div>
-                  <a
-                    className="mt-2 block break-all text-[var(--rentsure-blue)] hover:underline"
-                    href={invitePreviewById[invite.id]}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {invitePreviewById[invite.id]}
-                  </a>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

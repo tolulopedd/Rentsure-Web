@@ -37,7 +37,7 @@ type CompleteSignupResponse = {
 
 function getPasswordRequirementStates(password: string) {
   return [
-    { label: "10+ chars", met: password.length >= 10 },
+    { label: "8+ chars", met: password.length >= 8 },
     { label: "Uppercase", met: /[A-Z]/.test(password) },
     { label: "Lowercase", met: /[a-z]/.test(password) },
     { label: "Number", met: /\d/.test(password) },

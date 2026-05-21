@@ -1,13 +1,24 @@
-import { Outlet } from "react-router-dom";
-import { NavLink } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 import { PublicWorkspaceSidebar } from "@/components/public-workspace-sidebar";
 import { PublicWorkspaceTopbar } from "@/components/public-workspace-topbar";
+import { Button } from "@/components/ui/button";
+import { clearAuthSession } from "@/lib/api";
+import { toast } from "sonner";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
 export function PublicWorkspaceLayout() {
+  const nav = useNavigate();
+
+  function logout() {
+    clearAuthSession();
+    toast.success("Logged out");
+    nav("/login");
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex min-h-screen">
@@ -18,7 +29,8 @@ export function PublicWorkspaceLayout() {
         <div className="flex flex-1 flex-col">
           <PublicWorkspaceTopbar />
           <div className="border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex gap-2 overflow-x-auto">
               {[
                 { label: "Dashboard", to: "/account/dashboard" },
                 { label: "Properties", to: "/account/properties" },
@@ -42,6 +54,17 @@ export function PublicWorkspaceLayout() {
                   {item.label}
                 </NavLink>
               ))}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 rounded-full px-3 text-[var(--rentsure-blue)] hover:bg-slate-100"
+                onClick={logout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
           <main className="relative flex-1 overflow-y-auto p-4 md:p-6">

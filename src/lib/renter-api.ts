@@ -64,6 +64,9 @@ export type RenterDashboardResponse = {
     profileCompletenessPercent: number;
     unreadNotifications: number;
   };
+  reportAccess: {
+    canShareOrDownload: boolean;
+  };
   notifications: Array<{
     id: string;
     notificationType: "PROPERTY_LINKED";
@@ -97,6 +100,7 @@ export type RenterDashboardResponse = {
     createdAt: string;
     paidAt?: string | null;
     verifiedAt?: string | null;
+    reportApprovedAt?: string | null;
     manualTransfer?: {
       bankName?: string;
       accountName?: string;

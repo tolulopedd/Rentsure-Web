@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { NigeriaAddressFields } from "@/components/NigeriaAddressFields";
+import { MapboxAddressFields } from "@/components/MapboxAddressFields";
 import { PassportPhotoCard } from "@/components/PassportPhotoCard";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import { getErrorMessage } from "@/lib/errors";
 import { formatDate } from "@/lib/renter-workspace-presenters";
 import { getRenterOnboarding } from "@/lib/onboarding";
+import { isValidNigeriaPhone, nigeriaPhoneMessage } from "@/lib/phone";
 import { preparePassportPhotoUpload, uploadPublicAccountDocument } from "@/lib/upload";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
@@ -32,12 +33,19 @@ export default function RenterWorkspaceProfile() {
   });
   const [nin, setNin] = useState("");
   const [bvn, setBvn] = useState("");
+  const [selectedIdentityType, setSelectedIdentityType] = useState<"NIN" | "BVN">("NIN");
   const [profileSaving, setProfileSaving] = useState(false);
   const [identitySaving, setIdentitySaving] = useState<"NIN" | "BVN" | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [profileDirty, setProfileDirty] = useState(false);
 
   useEffect(() => {
     if (!data) return;
+    if (profileDirty) {
+      setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
+      setBvn(data.profile.bvnVerifiedAt ? "" : data.profile.bvn || "");
+      return;
+    }
     setProfileDraft({
       organizationName: data.profile.organizationName || "",
       registrationNumber: data.profile.registrationNumber || "",
@@ -49,19 +57,27 @@ export default function RenterWorkspaceProfile() {
       address: data.profile.address || "",
       notes: data.profile.notes || ""
     });
-    setNin(data.profile.nin || "");
-    setBvn(data.profile.bvn || "");
-  }, [data]);
+    setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
+    setBvn(data.profile.bvnVerifiedAt ? "" : data.profile.bvn || "");
+    setSelectedIdentityType(data.profile.ninVerifiedAt ? "NIN" : data.profile.bvnVerifiedAt ? "BVN" : "NIN");
+  }, [data, profileDirty]);
 
   if (!data) return null;
   const profile = data.profile;
   const organizationName = profile.organizationName;
+  const phoneError = profileDraft.phone.trim() && !isValidNigeriaPhone(profileDraft.phone) ? nigeriaPhoneMessage() : "";
+  const verifiedIdentityType = profile.ninVerifiedAt ? "NIN" : profile.bvnVerifiedAt ? "BVN" : null;
+  const activeIdentityType = verifiedIdentityType ?? selectedIdentityType;
   const onboarding = useMemo(() => getRenterOnboarding(profile), [profile]);
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding.isComplete;
 
   async function submitProfile() {
+    if (!isValidNigeriaPhone(profileDraft.phone)) {
+      toast.error(nigeriaPhoneMessage());
+      return;
+    }
     setProfileSaving(true);
-    await saveProfile({
+    const success = await saveProfile({
       organizationName: profile.entityType === "COMPANY" ? profileDraft.organizationName : null,
       registrationNumber: profile.entityType === "COMPANY" ? profileDraft.registrationNumber : null,
       firstName: profileDraft.firstName,
@@ -72,6 +88,9 @@ export default function RenterWorkspaceProfile() {
       address: profileDraft.address,
       notes: profileDraft.notes || null
     });
+    if (success) {
+      setProfileDirty(false);
+    }
     setProfileSaving(false);
   }
 
@@ -172,12 +191,18 @@ export default function RenterWorkspaceProfile() {
                 <Field
                   label="Company name"
                   value={profileDraft.organizationName}
-                  onChange={(value) => setProfileDraft((current) => ({ ...current, organizationName: value }))}
+                  onChange={(value) => {
+                    setProfileDirty(true);
+                    setProfileDraft((current) => ({ ...current, organizationName: value }));
+                  }}
                 />
                 <Field
                   label="Registration number"
                   value={profileDraft.registrationNumber}
-                  onChange={(value) => setProfileDraft((current) => ({ ...current, registrationNumber: value }))}
+                  onChange={(value) => {
+                    setProfileDirty(true);
+                    setProfileDraft((current) => ({ ...current, registrationNumber: value }));
+                  }}
                 />
               </>
             ) : null}
@@ -187,26 +212,61 @@ export default function RenterWorkspaceProfile() {
               </div>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="First name" value={profileDraft.firstName} onChange={(value) => setProfileDraft((current) => ({ ...current, firstName: value }))} />
-              <Field label="Last name" value={profileDraft.lastName} onChange={(value) => setProfileDraft((current) => ({ ...current, lastName: value }))} />
+              <Field
+                label="First name"
+                value={profileDraft.firstName}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, firstName: value }));
+                }}
+              />
+              <Field
+                label="Last name"
+                value={profileDraft.lastName}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, lastName: value }));
+                }}
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Phone" value={profileDraft.phone} onChange={(value) => setProfileDraft((current) => ({ ...current, phone: value }))} />
+              <Field
+                label="Phone"
+                value={profileDraft.phone}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, phone: value }));
+                }}
+                helperText="Use 11 digits starting with 0, or +234 followed by 10 digits."
+                errorMessage={phoneError}
+              />
               <Field label="Email" value={profile.email} onChange={() => {}} readOnly />
             </div>
-            <NigeriaAddressFields
+            <MapboxAddressFields
               stateValue={profileDraft.state}
               cityValue={profileDraft.city}
               addressValue={profileDraft.address}
-              onStateChange={(value) => setProfileDraft((current) => ({ ...current, state: value }))}
-              onCityChange={(value) => setProfileDraft((current) => ({ ...current, city: value }))}
-              onAddressChange={(value) => setProfileDraft((current) => ({ ...current, address: value }))}
+              onStateChange={(value) => {
+                setProfileDirty(true);
+                setProfileDraft((current) => ({ ...current, state: value }));
+              }}
+              onCityChange={(value) => {
+                setProfileDirty(true);
+                setProfileDraft((current) => ({ ...current, city: value }));
+              }}
+              onAddressChange={(value) => {
+                setProfileDirty(true);
+                setProfileDraft((current) => ({ ...current, address: value }));
+              }}
             />
             <div className="space-y-2">
               <Label>Additional information</Label>
               <Textarea
                 value={profileDraft.notes}
-                onChange={(event) => setProfileDraft((current) => ({ ...current, notes: event.target.value }))}
+                onChange={(event) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, notes: event.target.value }));
+                }}
                 className="bg-white"
               />
             </div>
@@ -222,21 +282,32 @@ export default function RenterWorkspaceProfile() {
               <CardTitle className="text-lg">Identity validation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
+              {!verifiedIdentityType ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(["NIN", "BVN"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setSelectedIdentityType(item)}
+                      className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                        activeIdentityType === item
+                          ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="font-semibold">{item}</div>
+                      <div className="mt-1 text-xs text-current/80">Validate your {item}.</div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <IdentityBlock
-                label="NIN"
-                value={nin}
-                onChange={setNin}
-                verifiedAt={profile.ninVerifiedAt}
-                loading={identitySaving === "NIN"}
-                onVerify={() => void submitIdentity("NIN")}
-              />
-              <IdentityBlock
-                label="BVN"
-                value={bvn}
-                onChange={setBvn}
-                verifiedAt={profile.bvnVerifiedAt}
-                loading={identitySaving === "BVN"}
-                onVerify={() => void submitIdentity("BVN")}
+                label={activeIdentityType}
+                value={activeIdentityType === "NIN" ? nin : bvn}
+                onChange={activeIdentityType === "NIN" ? setNin : setBvn}
+                verifiedAt={activeIdentityType === "NIN" ? profile.ninVerifiedAt : profile.bvnVerifiedAt}
+                loading={identitySaving === activeIdentityType}
+                onVerify={() => void submitIdentity(activeIdentityType)}
               />
             </CardContent>
           </Card>
@@ -265,17 +336,27 @@ function Field({
   label,
   value,
   onChange,
-  readOnly
+  readOnly,
+  helperText,
+  errorMessage
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  helperText?: string;
+  errorMessage?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} readOnly={readOnly} className="bg-white" />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        className={`bg-white ${errorMessage ? "border-rose-300 focus-visible:ring-rose-200" : ""}`}
+      />
+      {errorMessage ? <p className="text-xs text-rose-600">{errorMessage}</p> : helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
     </div>
   );
 }
@@ -295,27 +376,35 @@ function IdentityBlock({
   loading: boolean;
   onVerify: () => void;
 }) {
+  const isVerified = Boolean(verifiedAt);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold text-slate-950">{label} validation</p>
           <p className="text-sm text-slate-600">
-            {verifiedAt ? `Verified on ${formatDate(verifiedAt)}` : `Enter your ${label} and validate it through RentSure.`}
+            {isVerified ? `Verified on ${formatDate(verifiedAt)}` : `Enter your ${label} and validate it through RentSure.`}
           </p>
         </div>
-        {verifiedAt ? (
+        {isVerified ? (
           <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Verified</Badge>
         ) : (
           <Badge variant="outline">Pending</Badge>
         )}
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-        <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
-        <Button variant="outline" onClick={onVerify} disabled={loading || Boolean(verifiedAt)}>
-          {verifiedAt ? "Validated" : loading ? "Validating..." : `Validate ${label}`}
-        </Button>
-      </div>
+      {isVerified ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Your {label} has been validated and stored securely. It is no longer shown here.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
+          <Button variant="outline" onClick={onVerify} disabled={loading}>
+            {loading ? "Validating..." : `Validate ${label}`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

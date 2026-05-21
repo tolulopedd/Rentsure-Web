@@ -29,7 +29,7 @@ export default function RenterWorkspaceCases() {
     <div className="space-y-6">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.16),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">My Links</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Track every properties linked by landlord or agent to you</h1>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">Track every properties linked by landlord or agent to you</h1>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.38fr]">

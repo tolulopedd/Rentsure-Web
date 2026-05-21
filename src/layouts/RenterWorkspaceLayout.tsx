@@ -1,4 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { clearAuthSession } from "@/lib/api";
@@ -12,6 +15,13 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 function RenterWorkspaceShell() {
   const { data, loading, loadError, refresh } = useRenterWorkspace();
+  const nav = useNavigate();
+
+  function logout() {
+    clearAuthSession();
+    toast.success("Logged out");
+    nav("/login");
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-muted/30 px-6 py-10 text-muted-foreground">Loading renter workspace...</div>;
@@ -60,7 +70,8 @@ function RenterWorkspaceShell() {
         <div className="flex flex-1 flex-col">
           <RenterWorkspaceTopbar />
           <div className="border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex gap-2 overflow-x-auto">
               {[
                 { label: "Dashboard", to: "/account/renter/dashboard" },
                 { label: "Linked Properties", to: "/account/renter/cases" },
@@ -85,6 +96,17 @@ function RenterWorkspaceShell() {
                   {item.label}
                 </NavLink>
               ))}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 rounded-full px-3 text-[var(--rentsure-blue)] hover:bg-slate-100"
+                onClick={logout}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
           <main className="relative flex-1 overflow-y-auto p-4 md:p-6">

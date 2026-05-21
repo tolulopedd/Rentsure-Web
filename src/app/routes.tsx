@@ -10,6 +10,9 @@ import VerifyEmail from "@/pages/VerifyEmail";
 import AccountHome from "@/pages/AccountHome";
 import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
+import AdminUnregisteredRequestsPage from "@/pages/AdminUnregisteredRequestsPage";
+import AdminRenterActivitiesPage from "@/pages/AdminRenterActivitiesPage";
+import AdminLandlordAgentActivitiesPage from "@/pages/AdminLandlordAgentActivitiesPage";
 import RentersPage from "@/pages/RentersPage";
 import RentScoreAdminPage from "@/pages/RentScoreAdminPage";
 import PublicWorkspaceDashboard from "@/pages/PublicWorkspaceDashboard";
@@ -80,6 +83,9 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <AppIndexRedirect /> },
           { path: "dashboard", element: <Dashboard /> },
+          { path: "unregistered-requests", element: <AdminRoute element={<AdminUnregisteredRequestsPage />} /> },
+          { path: "renter-activities", element: <AdminRoute element={<AdminRenterActivitiesPage />} /> },
+          { path: "landlord-agent-activities", element: <AdminRoute element={<AdminLandlordAgentActivitiesPage />} /> },
           { path: "renters", element: <AdminRoute element={<RentersPage />} /> },
           { path: "rent-score", element: <AdminRoute element={<RentScoreAdminPage />} /> },
           { path: "profile", element: <Profile /> },

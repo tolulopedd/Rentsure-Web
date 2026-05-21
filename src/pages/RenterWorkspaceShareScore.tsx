@@ -79,6 +79,7 @@ export default function RenterWorkspaceShareScore() {
   if (!data) return null;
   const fileStem = (data.profile.organizationName || data.profile.firstName || "renter").toLowerCase().replace(/\s+/g, "-");
   const scoreGuidance = rentScoreGuidance(data.rentScore.summary.score);
+  const reportReady = data.reportAccess.canShareOrDownload;
   const shouldShowGuidance =
     Boolean(selectedRecipient) ||
     Boolean(draft.firstName.trim()) ||
@@ -138,6 +139,10 @@ export default function RenterWorkspaceShareScore() {
   }
 
   async function submitShare() {
+    if (!reportReady) {
+      toast.error("Your rent score report will be available after admin approval.");
+      return;
+    }
     if (!draft.firstName.trim()) {
       toast.error(`Enter the ${recipientType.toLowerCase()} first name.`);
       return;
@@ -226,7 +231,12 @@ export default function RenterWorkspaceShareScore() {
               <p className="text-sm text-slate-600">{data.profile.address}</p>
               <p className="text-sm text-slate-600">{data.profile.city}, {data.profile.state}</p>
             </div>
-            <Button variant="outline" onClick={downloadReport}>
+            {!reportReady ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Your rent score report will be available after admin approval.
+              </div>
+            ) : null}
+            <Button variant="outline" onClick={downloadReport} disabled={!reportReady}>
               <Download className="mr-2 h-4 w-4" />
               Download report
             </Button>
@@ -367,7 +377,7 @@ export default function RenterWorkspaceShareScore() {
             <Button
               className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
               onClick={() => void submitShare()}
-              disabled={submitting || !draft.email.trim()}
+              disabled={submitting || !draft.email.trim() || !reportReady}
             >
               <Send className="mr-2 h-4 w-4" />
               {submitting ? "Sharing..." : "Share report"}

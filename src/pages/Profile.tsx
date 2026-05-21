@@ -32,7 +32,7 @@ function passwordChecks(value: string) {
 }
 
 function strongPasswordError(value: string) {
-  if (value.length < 10) return "New password must be at least 10 characters.";
+  if (value.length < 8) return "New password must be at least 8 characters.";
   if (!/[A-Z]/.test(value)) return "New password must include at least one uppercase letter.";
   if (!/[a-z]/.test(value)) return "New password must include at least one lowercase letter.";
   if (!/\d/.test(value)) return "New password must include at least one number.";

@@ -78,6 +78,108 @@ export type PendingRenterInviteItem = {
   createdAt: string;
 };
 
+export type AdminRenterActivityItem = {
+  id: string;
+  activityType: string;
+  message: string;
+  createdAt: string;
+  actor: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+  renter: {
+    proposedRenterId: string;
+    accountId?: string | null;
+    name: string;
+    email: string;
+    status: string;
+    decision?: string | null;
+  };
+  property: {
+    id: string;
+    summaryLabel: string;
+    address: string;
+    city: string;
+    state: string;
+  };
+};
+
+export type AdminLandlordAgentActivityItem = {
+  id: string;
+  activityType: string;
+  message: string;
+  createdAt: string;
+  actor: {
+    id: string;
+    accountType: "LANDLORD" | "AGENT";
+    name: string;
+    email: string;
+  } | null;
+  renter: {
+    proposedRenterId: string;
+    accountId?: string | null;
+    name: string;
+    email: string;
+    status: string;
+    decision?: string | null;
+  };
+  property: {
+    id: string;
+    summaryLabel: string;
+    address: string;
+    city: string;
+    state: string;
+  };
+  latestScoreRequest: {
+    id: string;
+    status: string;
+    createdAt: string;
+    reviewedAt?: string | null;
+    requestedBy: string;
+    forwardedTo?: string | null;
+  } | null;
+  latestRentScorePayment: {
+    id: string;
+    provider: string;
+    status: string;
+    amountNgn: number;
+    reference: string;
+    reportApprovedAt?: string | null;
+  } | null;
+  shareApproval: {
+    status: "APPROVED" | "PENDING" | "NOT_REQUESTED";
+    canApprove: boolean;
+  };
+};
+
+export type PendingRentScoreReportApprovalItem = {
+  id: string;
+  reportType: "LANDLORD_REQUEST" | "RENTER_SELF_SERVICE";
+  amountNgn: number;
+  currency: string;
+  provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
+  reference: string;
+  createdAt: string;
+  requestedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  renter: {
+    accountId: string;
+    name: string;
+    email: string;
+  };
+  property?: {
+    id: string;
+    summaryLabel: string;
+    address: string;
+    city: string;
+    state: string;
+  } | null;
+};
+
 export type PendingManualRentScorePaymentItem = {
   id: string;
   reference: string;
@@ -263,6 +365,14 @@ export function listPendingRenterInvites() {
   return apiFetch<{ items: PendingRenterInviteItem[] }>("/api/admin/renter-invites");
 }
 
+export function listAdminRenterActivities() {
+  return apiFetch<{ items: AdminRenterActivityItem[] }>("/api/admin/renter-activities");
+}
+
+export function listAdminLandlordAgentActivities() {
+  return apiFetch<{ items: AdminLandlordAgentActivityItem[] }>("/api/admin/landlord-agent-activities");
+}
+
 export function resendPendingRenterInvite(proposedRenterId: string) {
   return apiFetch<{ success: true; invitePreviewUrl?: string | null }>(
     `/api/admin/renter-invites/${encodeURIComponent(proposedRenterId)}/remind`,
@@ -276,6 +386,10 @@ export function listManualRentScorePayments() {
   return apiFetch<{ items: PendingManualRentScorePaymentItem[] }>("/api/admin/rent-score/payments/manual");
 }
 
+export function listPendingRentScoreReportApprovals() {
+  return apiFetch<{ items: PendingRentScoreReportApprovalItem[] }>("/api/admin/rent-score/report-approvals");
+}
+
 export function confirmManualRentScorePayment(paymentId: string) {
   return apiFetch<{ success: true }>(
     `/api/admin/rent-score/payments/manual/${encodeURIComponent(paymentId)}/confirm`,
@@ -283,4 +397,10 @@ export function confirmManualRentScorePayment(paymentId: string) {
       method: "POST"
     }
   );
+}
+
+export function approveRentScoreReport(paymentId: string) {
+  return apiFetch<{ success: true }>(`/api/admin/rent-score/payments/${encodeURIComponent(paymentId)}/approve-report`, {
+    method: "POST"
+  });
 }

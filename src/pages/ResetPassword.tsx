@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, MailCheck } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,8 @@ export default function ResetPassword() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResetPasswordResponse | null>(null);
@@ -154,30 +156,50 @@ export default function ResetPassword() {
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="reset-password">New password</Label>
-                      <Input
-                        id="reset-password"
-                        autoComplete="new-password"
-                        className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
-                        onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Enter new password"
-                        type="password"
-                        value={password}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="reset-password"
+                          autoComplete="new-password"
+                          className="border border-slate-300 pr-11 focus:border-slate-400 focus:ring-slate-300"
+                          onChange={(event) => setPassword(event.target.value)}
+                          placeholder="Enter new password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                        />
+                        <button
+                          type="button"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 transition hover:text-[var(--rentsure-blue)]"
+                          onClick={() => setShowPassword((current) => !current)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirm-password">Confirm password</Label>
-                      <Input
-                        id="confirm-password"
-                        autoComplete="new-password"
-                        className="border border-slate-300 focus:border-slate-400 focus:ring-slate-300"
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        placeholder="Confirm new password"
-                        type="password"
-                        value={confirmPassword}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="confirm-password"
+                          autoComplete="new-password"
+                          className="border border-slate-300 pr-11 focus:border-slate-400 focus:ring-slate-300"
+                          onChange={(event) => setConfirmPassword(event.target.value)}
+                          placeholder="Confirm new password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                        />
+                        <button
+                          type="button"
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 transition hover:text-[var(--rentsure-blue)]"
+                          onClick={() => setShowConfirmPassword((current) => !current)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <p className="text-xs leading-5 text-slate-500">
-                      Use at least 10 characters with uppercase, lowercase, number, and special character.
+                      Use at least 8 characters with uppercase, lowercase, number, and special character.
                     </p>
                   </>
                 ) : (

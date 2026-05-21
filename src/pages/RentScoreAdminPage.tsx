@@ -9,13 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { getErrorMessage } from "@/lib/errors";
 import {
+  approveRentScoreReport,
   confirmManualRentScorePayment,
   createRentScoreRule,
   getRentScoreConfig,
   listManualRentScorePayments,
+  listPendingRentScoreReportApprovals,
   updateRentScorePolicy,
   updateRentScoreRule,
   type PendingManualRentScorePaymentItem,
+  type PendingRentScoreReportApprovalItem,
   type RentScoreConfig
 } from "@/lib/rent-score-api";
 
@@ -99,6 +102,7 @@ function renterName(item: PendingManualRentScorePaymentItem["renter"]) {
 export default function RentScoreAdminPage() {
   const [config, setConfig] = useState<RentScoreConfig | null>(null);
   const [manualPayments, setManualPayments] = useState<PendingManualRentScorePaymentItem[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingRentScoreReportApprovalItem[]>([]);
   const [policyDraft, setPolicyDraft] = useState<PolicyDraft | null>(null);
   const [ruleDrafts, setRuleDrafts] = useState<RuleDraftMap>({});
   const [newRule, setNewRule] = useState<NewRuleDraft>(emptyRuleDraft);
@@ -106,6 +110,7 @@ export default function RentScoreAdminPage() {
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null);
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null);
+  const [approvingReportId, setApprovingReportId] = useState<string | null>(null);
   const [creatingRule, setCreatingRule] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,18 +118,21 @@ export default function RentScoreAdminPage() {
     try {
       setLoading(true);
       setError(null);
-      const [configResponse, manualPaymentResponse] = await Promise.all([
+      const [configResponse, manualPaymentResponse, pendingApprovalsResponse] = await Promise.all([
         getRentScoreConfig(),
-        listManualRentScorePayments()
+        listManualRentScorePayments(),
+        listPendingRentScoreReportApprovals()
       ]);
       setConfig(configResponse);
       setPolicyDraft(buildPolicyDraft(configResponse));
       setRuleDrafts(buildRuleDrafts(configResponse));
       setManualPayments(manualPaymentResponse.items);
+      setPendingApprovals(pendingApprovalsResponse.items);
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, "Failed to load rent score configuration"));
       setConfig(null);
       setManualPayments([]);
+      setPendingApprovals([]);
     } finally {
       setLoading(false);
     }
@@ -222,11 +230,24 @@ export default function RentScoreAdminPage() {
     }
   }
 
+  async function approveReport(paymentId: string) {
+    try {
+      setApprovingReportId(paymentId);
+      await approveRentScoreReport(paymentId);
+      setPendingApprovals((current) => current.filter((item) => item.id !== paymentId));
+      toast.success("Rent score report approved");
+    } catch (approveError: unknown) {
+      toast.error(getErrorMessage(approveError, "Failed to approve rent score report"));
+    } finally {
+      setApprovingReportId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Rent score configuration</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Rent score setup</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Configure the live 0 to 900 scoring policy and manage the rule weights used across RentSure.
           </p>
@@ -243,6 +264,58 @@ export default function RentScoreAdminPage() {
 
       {config && policyDraft ? (
         <>
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">Pending report approvals</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!pendingApprovals.length ? (
+                <p className="text-sm text-muted-foreground">No rent score reports are waiting for approval right now.</p>
+              ) : null}
+              {pendingApprovals.map((item) => (
+                <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] lg:items-start">
+                    <div className="space-y-2">
+                      <p className="font-semibold text-slate-950">{item.renter.name}</p>
+                      <p className="text-sm text-slate-600">{item.renter.email}</p>
+                      <p className="text-sm text-slate-600">
+                        {item.reportType === "LANDLORD_REQUEST" ? "Landlord / agent request" : "Renter self-service"}
+                      </p>
+                      {item.property ? (
+                        <p className="text-xs text-muted-foreground">
+                          {item.property.summaryLabel} · {item.property.city}, {item.property.state}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-600">
+                      <p>
+                        <span className="font-medium text-slate-950">Amount:</span> {formatNgn(item.amountNgn)}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Provider:</span> {item.provider.replaceAll("_", " ")}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Reference:</span> {item.reference}
+                      </p>
+                      <p>
+                        <span className="font-medium text-slate-950">Date:</span> {formatDate(item.createdAt)}
+                      </p>
+                    </div>
+                    <div className="lg:justify-self-end">
+                      <Button
+                        onClick={() => void approveReport(item.id)}
+                        disabled={approvingReportId === item.id}
+                        className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                      >
+                        {approvingReportId === item.id ? "Approving..." : "Approve report"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Manual transfer payments</CardTitle>

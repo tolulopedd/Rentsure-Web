@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { NigeriaAddressFields } from "@/components/NigeriaAddressFields";
+import { MapboxAddressFields } from "@/components/MapboxAddressFields";
 import { PassportPhotoCard } from "@/components/PassportPhotoCard";
 import { getErrorMessage } from "@/lib/errors";
 import { getWorkspaceOnboarding } from "@/lib/onboarding";
+import { isValidNigeriaPhone, nigeriaPhoneMessage } from "@/lib/phone";
 import {
   getWorkspaceProfile,
   saveWorkspacePassportPhoto,
@@ -31,6 +32,7 @@ export default function PublicWorkspaceProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [profileDirty, setProfileDirty] = useState(false);
   const [draft, setDraft] = useState({
     accountType: "LANDLORD" as "LANDLORD" | "AGENT",
     representation: "",
@@ -52,21 +54,23 @@ export default function PublicWorkspaceProfile() {
       setLoading(true);
       const response = await getWorkspaceProfile();
       setData(response);
-      setDraft({
-        accountType: response.profile.accountType,
-        representation: response.profile.representation || "",
-        organizationName: response.profile.organizationName || "",
-        registrationNumber: response.profile.registrationNumber || "",
-        firstName: response.profile.firstName || "",
-        lastName: response.profile.lastName || "",
-        phone: response.profile.phone || "",
-        state: response.profile.state || "",
-        city: response.profile.city || "",
-        address: response.profile.address || "",
-        propertyCount: response.profile.propertyCount || "",
-        portfolioType: response.profile.portfolioType || "",
-        notes: response.profile.notes || ""
-      });
+      if (!profileDirty) {
+        setDraft({
+          accountType: response.profile.accountType,
+          representation: response.profile.representation || "",
+          organizationName: response.profile.organizationName || "",
+          registrationNumber: response.profile.registrationNumber || "",
+          firstName: response.profile.firstName || "",
+          lastName: response.profile.lastName || "",
+          phone: response.profile.phone || "",
+          state: response.profile.state || "",
+          city: response.profile.city || "",
+          address: response.profile.address || "",
+          propertyCount: response.profile.propertyCount || "",
+          portfolioType: response.profile.portfolioType || "",
+          notes: response.profile.notes || ""
+        });
+      }
       updateStoredUserIdentity({
         fullName: displayName(response.profile),
         email: response.profile.email
@@ -109,6 +113,10 @@ export default function PublicWorkspaceProfile() {
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding?.isComplete;
 
   async function submitProfile() {
+    if (!isValidNigeriaPhone(draft.phone)) {
+      toast.error(nigeriaPhoneMessage());
+      return;
+    }
     try {
       setSaving(true);
       const response = await updateWorkspaceProfile({
@@ -124,9 +132,10 @@ export default function PublicWorkspaceProfile() {
         address: draft.address,
         propertyCount: draft.propertyCount || null,
         portfolioType: draft.portfolioType || null,
-        notes: draft.notes || null
+      notes: draft.notes || null
       });
       setData(response);
+      setProfileDirty(false);
       updateStoredUserIdentity({
         fullName: displayName(response.profile),
         email: response.profile.email
@@ -175,6 +184,7 @@ export default function PublicWorkspaceProfile() {
   if (!profile) {
     return <div className="text-sm text-destructive">We could not load this landlord / agent profile.</div>;
   }
+  const phoneError = draft.phone.trim() && !isValidNigeriaPhone(draft.phone) ? nigeriaPhoneMessage() : "";
 
   const roleOptions =
     profile.entityType === "COMPANY"
@@ -258,10 +268,12 @@ export default function PublicWorkspaceProfile() {
                     key={item.value}
                     type="button"
                     onClick={() =>
-                      setDraft((current) => {
-                        const nextRepresentation =
-                          roleOptions.find((option) => option.accountType === item.value)?.representation || "";
-                        return {
+                      {
+                        setProfileDirty(true);
+                        setDraft((current) => {
+                          const nextRepresentation =
+                            roleOptions.find((option) => option.accountType === item.value)?.representation || "";
+                          return {
                           ...current,
                           accountType: item.value,
                           representation: roleOptions.some(
@@ -269,8 +281,9 @@ export default function PublicWorkspaceProfile() {
                           )
                             ? current.representation
                             : nextRepresentation
-                        };
-                      })
+                          };
+                        });
+                      }
                     }
                     className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
                       draft.accountType === item.value
@@ -292,9 +305,12 @@ export default function PublicWorkspaceProfile() {
                   .filter((item) => item.accountType === draft.accountType)
                   .map((item) => (
                     <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => setDraft((current) => ({ ...current, representation: item.representation, accountType: item.accountType }))}
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setProfileDirty(true);
+                      setDraft((current) => ({ ...current, representation: item.representation, accountType: item.accountType }));
+                    }}
                       className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
                         draft.representation === item.representation
                           ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]"
@@ -312,40 +328,81 @@ export default function PublicWorkspaceProfile() {
                 <Field
                   label="Company name"
                   value={draft.organizationName}
-                  onChange={(value) => setDraft((current) => ({ ...current, organizationName: value }))}
+                  onChange={(value) => {
+                    setProfileDirty(true);
+                    setDraft((current) => ({ ...current, organizationName: value }));
+                  }}
                 />
                 <Field
                   label="Registration number"
                   value={draft.registrationNumber}
-                  onChange={(value) => setDraft((current) => ({ ...current, registrationNumber: value }))}
+                  onChange={(value) => {
+                    setProfileDirty(true);
+                    setDraft((current) => ({ ...current, registrationNumber: value }));
+                  }}
                 />
               </>
             ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="First name" value={draft.firstName} onChange={(value) => setDraft((current) => ({ ...current, firstName: value }))} />
-              <Field label="Last name" value={draft.lastName} onChange={(value) => setDraft((current) => ({ ...current, lastName: value }))} />
+              <Field
+                label="First name"
+                value={draft.firstName}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, firstName: value }));
+                }}
+              />
+              <Field
+                label="Last name"
+                value={draft.lastName}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, lastName: value }));
+                }}
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Phone" value={draft.phone} onChange={(value) => setDraft((current) => ({ ...current, phone: value }))} />
+              <Field
+                label="Phone"
+                value={draft.phone}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, phone: value }));
+                }}
+                helperText="Use 11 digits starting with 0, or +234 followed by 10 digits."
+                errorMessage={phoneError}
+              />
               <Field label="Email" value={profile.email} onChange={() => {}} readOnly />
             </div>
 
-            <NigeriaAddressFields
+            <MapboxAddressFields
               stateValue={draft.state}
               cityValue={draft.city}
               addressValue={draft.address}
-              onStateChange={(value) => setDraft((current) => ({ ...current, state: value }))}
-              onCityChange={(value) => setDraft((current) => ({ ...current, city: value }))}
-              onAddressChange={(value) => setDraft((current) => ({ ...current, address: value }))}
+              onStateChange={(value) => {
+                setProfileDirty(true);
+                setDraft((current) => ({ ...current, state: value }));
+              }}
+              onCityChange={(value) => {
+                setProfileDirty(true);
+                setDraft((current) => ({ ...current, city: value }));
+              }}
+              onAddressChange={(value) => {
+                setProfileDirty(true);
+                setDraft((current) => ({ ...current, address: value }));
+              }}
             />
 
             <div className="space-y-2">
               <Label>Portfolio size</Label>
               <Input
                 value={draft.propertyCount}
-                onChange={(event) => setDraft((current) => ({ ...current, propertyCount: event.target.value }))}
+                onChange={(event) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, propertyCount: event.target.value }));
+                }}
                 className="bg-white"
                 placeholder="How many properties or units do you manage?"
               />
@@ -355,7 +412,10 @@ export default function PublicWorkspaceProfile() {
               <Label>Portfolio type</Label>
               <Input
                 value={draft.portfolioType}
-                onChange={(event) => setDraft((current) => ({ ...current, portfolioType: event.target.value }))}
+                onChange={(event) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, portfolioType: event.target.value }));
+                }}
                 className="bg-white"
                 placeholder="Residential, estate management, mixed portfolio..."
               />
@@ -363,7 +423,14 @@ export default function PublicWorkspaceProfile() {
 
             <div className="space-y-2">
               <Label>Additional information</Label>
-              <Textarea value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} className="bg-white" />
+              <Textarea
+                value={draft.notes}
+                onChange={(event) => {
+                  setProfileDirty(true);
+                  setDraft((current) => ({ ...current, notes: event.target.value }));
+                }}
+                className="bg-white"
+              />
             </div>
 
             <Button onClick={() => void submitProfile()} disabled={saving} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
@@ -420,17 +487,27 @@ function Field({
   label,
   value,
   onChange,
-  readOnly
+  readOnly,
+  helperText,
+  errorMessage
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  helperText?: string;
+  errorMessage?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} readOnly={readOnly} className="bg-white" />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        className={`bg-white ${errorMessage ? "border-rose-300 focus-visible:ring-rose-200" : ""}`}
+      />
+      {errorMessage ? <p className="text-xs text-rose-600">{errorMessage}</p> : helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
     </div>
   );
 }
