@@ -77,7 +77,7 @@ const scoreSignals: Array<{ label: string; value: string; description: string; i
 
 const adaDemoFacts = [
   { label: "Yearly rent", value: "₦1,250,000" },
-  { label: "Completed Rent", value: "2" }
+  { label: "Rent paid", value: "2" }
 ];
 
 const scoreSteps = [
@@ -99,6 +99,21 @@ const trustStats = [
   { value: "2-sided", label: "Experience for both tenants and property teams" },
   { value: "< 2 min", label: "Fast onboarding for first-time applicants" },
   { value: "1 view", label: "Unified rent score for all renters in Nigeria." }
+];
+
+const footerLinks = [
+  { label: "Value", href: "#value" },
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Rent score", href: "#score" },
+  { label: "Sign in", href: "/login", internal: true },
+  { label: "Get started", href: "/signup", internal: true }
+];
+
+const socialLinks = [
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/rentsure" },
+  { label: "Instagram", href: "https://www.instagram.com/rentsure" },
+  { label: "X", href: "https://x.com/rentsure" },
+  { label: "Email", href: "mailto:info@rentsureng.com" }
 ];
 
 const SCORE_MIN = 0;
@@ -517,6 +532,75 @@ export default function Landing() {
           </div>
         </section>
       </main>
+
+      <footer className="border-t border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(243,246,255,0.92))]">
+        <div className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-10">
+          <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.3)] backdrop-blur">
+            <div className="grid gap-10 px-6 py-8 sm:px-8 lg:grid-cols-[1.15fr_0.85fr_0.85fr] lg:px-10 lg:py-10">
+              <div>
+                <BrandLogo size="sm" />
+                <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
+                  RentSure helps tenants build trust early and helps landlords or agents make rental decisions with
+                  more confidence.
+                </p>
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--rentsure-blue)]/10 bg-[var(--rentsure-blue-soft)]/50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
+                  <span className="h-2 w-2 rounded-full bg-[var(--rentsure-blue)]" />
+                  Made for Nigeria rental decisions
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Quick links</p>
+                <div className="mt-4 grid gap-2.5 text-sm text-slate-600">
+                  {footerLinks.map((item) =>
+                    item.internal ? (
+                      <Link
+                        key={item.label}
+                        className="rounded-xl px-3 py-2 transition hover:bg-[var(--rentsure-blue-soft)]/55 hover:text-[var(--rentsure-blue)]"
+                        to={item.href}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <a
+                        key={item.label}
+                        className="rounded-xl px-3 py-2 transition hover:bg-[var(--rentsure-blue-soft)]/55 hover:text-[var(--rentsure-blue)]"
+                        href={item.href}
+                      >
+                        {item.label}
+                      </a>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Follow RentSure</p>
+                <div className="mt-4 grid gap-2.5 text-sm text-slate-600">
+                  {socialLinks.map((item) => (
+                    <a
+                      key={item.label}
+                      className="rounded-xl px-3 py-2 transition hover:bg-[var(--rentsure-blue-soft)]/55 hover:text-[var(--rentsure-blue)]"
+                      href={item.href}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {item.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200/80 px-6 py-5 sm:px-8 lg:px-10">
+              <div className="flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                <p>© {new Date().getFullYear()} RentSure. All rights reserved.</p>
+                <p>Nigeria rental trust and decision platform.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
