@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, BadgeCheck, Building2, MailCheck, UserRound } from "lucide-react";
+import { ArrowLeft, BadgeCheck, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { publicFetch } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { usePageSeo } from "@/lib/usePageSeo";
@@ -215,35 +215,31 @@ export default function Signup() {
               </div>
             ) : (
               <div className="space-y-5">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="space-y-3">
-                    <Tabs value={form.track} onValueChange={(value) => update("track", value as SignupTrack)}>
-                      <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm">
-                        <TabsTrigger value="RENTER" className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-[var(--rentsure-blue)] data-[state=active]:text-white">
-                          <span className="inline-flex items-center gap-2">
-                            <UserRound className="h-4 w-4" />
-                            Renter
-                          </span>
-                        </TabsTrigger>
-                        <TabsTrigger value="PROPERTY" className="h-12 rounded-xl text-sm font-semibold data-[state=active]:bg-[var(--rentsure-blue)] data-[state=active]:text-white">
-                          <span className="inline-flex items-center gap-2">
-                            <Building2 className="h-4 w-4" />
-                            Landlord / Agent
-                          </span>
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Account type</Label>
+                    <Select value={form.track} onValueChange={(value) => update("track", value as SignupTrack)}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Select account type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="RENTER">Renter</SelectItem>
+                        <SelectItem value="PROPERTY">Landlord / Agent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    <Tabs value={form.entityType} onValueChange={(value) => update("entityType", value as SignupEntity)}>
-                      <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm">
-                        <TabsTrigger value="INDIVIDUAL" className="h-11 rounded-xl text-sm font-medium data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm">
-                          Individual
-                        </TabsTrigger>
-                        <TabsTrigger value="COMPANY" className="h-11 rounded-xl text-sm font-medium data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm">
-                          Company
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
+                  <div className="space-y-2">
+                    <Label>Are you?</Label>
+                    <Select value={form.entityType} onValueChange={(value) => update("entityType", value as SignupEntity)}>
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Select entity type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="INDIVIDUAL">Individual</SelectItem>
+                        <SelectItem value="COMPANY">Company</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
