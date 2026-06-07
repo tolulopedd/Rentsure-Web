@@ -140,7 +140,7 @@ export default function RenterWorkspaceShareScore() {
 
   async function submitShare() {
     if (!reportReady) {
-      toast.error("Your rent score report will be available after admin approval.");
+      toast.error("Your rent score report is not ready yet.");
       return;
     }
     if (!draft.firstName.trim()) {
@@ -233,7 +233,7 @@ export default function RenterWorkspaceShareScore() {
             </div>
             {!reportReady ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Your rent score report will be available after admin approval.
+                Your rent score report is not ready yet.
               </div>
             ) : null}
             <Button variant="outline" onClick={downloadReport} disabled={!reportReady}>

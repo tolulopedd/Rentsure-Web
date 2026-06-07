@@ -24,7 +24,7 @@ function RenterWorkspaceShell() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-muted/30 px-6 py-10 text-muted-foreground">Loading renter workspace...</div>;
+    return <div className="min-h-screen bg-muted/30 px-4 py-6 text-muted-foreground md:px-6 md:py-10">Loading renter workspace...</div>;
   }
 
   if (!data) {
@@ -69,31 +69,31 @@ function RenterWorkspaceShell() {
 
         <div className="flex flex-1 flex-col">
           <RenterWorkspaceTopbar />
-          <div className="border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex gap-2 overflow-x-auto">
+          <div className="border-b border-slate-200 bg-white px-2.5 py-2.5 md:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: "Dashboard", to: "/account/renter/dashboard" },
-                { label: "Linked Properties", to: "/account/renter/cases" },
-                { label: "Landlord Decision", to: "/account/renter/queue" },
-                { label: "Payments", to: "/account/renter/payments" },
-                { label: "Buy rent score", to: "/account/renter/buy-score" },
-                { label: "Profile", to: "/account/renter/profile" },
-                { label: "Share score", to: "/account/renter/share-score" }
+                { label: "Dashboard", mobileLabel: "Dashboard", to: "/account/renter/dashboard" },
+                { label: "Linked Properties", mobileLabel: "My Links", to: "/account/renter/cases" },
+                { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/renter/queue" },
+                { label: "Payments", mobileLabel: "Payments", to: "/account/renter/payments" },
+                { label: "Profile", mobileLabel: "Profile", to: "/account/renter/profile" },
+                { label: "Share score", mobileLabel: "Share", to: "/account/renter/share-score" }
               ].map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) =>
                     cx(
-                      "whitespace-nowrap rounded-full px-3 py-2 text-sm transition",
+                      "whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-medium transition",
                       isActive
                         ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]"
                         : "bg-slate-100 text-slate-600"
                     )
                   }
                 >
-                  {item.label}
+                  <span className="sm:hidden">{item.mobileLabel}</span>
+                  <span className="hidden sm:inline">{item.label}</span>
                 </NavLink>
               ))}
               </div>
@@ -101,17 +101,17 @@ function RenterWorkspaceShell() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="shrink-0 rounded-full px-3 text-[var(--rentsure-blue)] hover:bg-slate-100"
+                className="shrink-0 rounded-full px-2.5 text-xs text-[var(--rentsure-blue)] hover:bg-slate-100"
                 onClick={logout}
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
-          <main className="relative flex-1 overflow-y-auto p-4 md:p-6">
+          <main className="relative flex-1 overflow-y-auto p-3 md:p-6">
             <div className="mx-auto max-w-7xl">
-              <div className="rounded-xl bg-background p-4 shadow-sm md:p-6">
+              <div className="rounded-xl bg-background p-3 shadow-sm md:p-6">
                 <Outlet />
               </div>
             </div>

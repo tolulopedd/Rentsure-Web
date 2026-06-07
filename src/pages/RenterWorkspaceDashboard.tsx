@@ -19,7 +19,7 @@ export default function RenterWorkspaceDashboard() {
   const onboarding = getRenterOnboarding(data.profile);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {!onboarding.isComplete ? (
         <Card className="border-[var(--rentsure-blue-soft)] bg-[linear-gradient(135deg,#ffffff,#f5f8ff)] shadow-sm">
           <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -47,7 +47,7 @@ export default function RenterWorkspaceDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             {data.notifications.slice(0, 3).map((notification) => (
-              <div key={notification.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={notification.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{notification.title}</p>
@@ -66,31 +66,33 @@ export default function RenterWorkspaceDashboard() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.95fr]">
-        <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.18),_transparent_34%),linear-gradient(135deg,#ffffff,#f3f8ff_62%,#edf4ff)] p-6 shadow-sm">
+      <div className="grid gap-4 xl:grid-cols-[1.3fr_0.95fr] xl:gap-6">
+        <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.18),_transparent_34%),linear-gradient(135deg,#ffffff,#f3f8ff_62%,#edf4ff)] p-4 shadow-sm md:rounded-[30px] md:p-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--rentsure-blue)]">Dashboard</p>
-          <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="mt-3 flex flex-col gap-3 lg:mt-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-950">Your current rent score</h1>
-              <div className="mt-4 text-6xl font-bold tracking-[-0.04em] text-slate-950">
-                {data.rentScore.summary.score}
-                <span className="ml-2 text-2xl font-medium text-slate-400">/ {data.rentScore.summary.maxScore}</span>
+              <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl md:text-3xl">Your current rent score</h1>
+              <div className="mt-3 flex flex-wrap items-end gap-3 md:mt-4">
+                <div className="text-4xl font-bold tracking-[-0.04em] text-slate-950 sm:text-5xl md:text-6xl">
+                  {data.rentScore.summary.score}
+                  <span className="ml-2 text-xl font-medium text-slate-400 sm:text-2xl">/ {data.rentScore.summary.maxScore}</span>
+                </div>
+                <Badge className={`sm:hidden ${scoreBandBadgeClass(data.rentScore.summary.scoreBand)}`}>
+                  {data.rentScore.summary.scoreBand}
+                </Badge>
               </div>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                Verified identity, payment confirmations, and update your profile. These should keep moving your score in the right direction.
+                To improve your score; verified identity, payment confirmations, and update your profile. These should keep moving your score in the right direction.
               </p>
             </div>
-            <div className="rounded-3xl border border-white/80 bg-white/80 px-5 py-4 text-right backdrop-blur">
+            <div className="hidden self-start rounded-3xl border border-white/80 bg-white/80 px-4 py-3 text-left backdrop-blur sm:block sm:px-5 sm:py-4 sm:text-right">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Band</p>
               <Badge className={`mt-2 ${scoreBandBadgeClass(data.rentScore.summary.scoreBand)}`}>
                 {data.rentScore.summary.scoreBand}
               </Badge>
-              <p className="mt-2 text-xs text-slate-500">
-                +{data.rentScore.summary.positivePoints} positive · -{data.rentScore.summary.negativePoints} negative
-              </p>
             </div>
           </div>
-          <div className="mt-6 rounded-[24px] border border-white/80 bg-white/80 p-4 backdrop-blur">
+          <div className="mt-4 rounded-[20px] border border-white/80 bg-white/80 p-3 backdrop-blur sm:p-4 md:mt-6 md:rounded-[24px]">
             <div className="flex items-center justify-between gap-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               <span>Score movement</span>
               <span>
@@ -110,7 +112,7 @@ export default function RenterWorkspaceDashboard() {
               <span>750</span>
               <span>900</span>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <div className="mt-4 grid gap-2 md:grid-cols-3">
               <ScoreAction
                 label="Identity"
                 value={data.profile.ninVerifiedAt || data.profile.bvnVerifiedAt ? "Verified in progress" : "Validate NIN or BVN"}
@@ -121,27 +123,18 @@ export default function RenterWorkspaceDashboard() {
               />
               <ScoreAction label="Profile" value={`${data.summary.profileCompletenessPercent}% profile confidence`} />
             </div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Button asChild className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
+              <Button asChild className="w-full bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)] xl:w-auto">
                 <Link to="/account/renter/share-score">Share rent score</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link to="/account/renter/queue">Landlord decision</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/account/renter/profile">Update profile</Link>
-              </Button>
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" className="w-full xl:w-auto">
                 <Link to="/account/renter/payments">Confirm payments</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/account/renter/buy-score">Buy rent score</Link>
               </Button>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-1 xl:gap-4">
           <MiniCard label="Profile completion" value={`${data.summary.profileCompletenessPercent}%`} icon={BadgeCheck} />
           <MiniCard label="Linked rental properties" value={String(data.summary.activeLinkedCases)} icon={Home} />
           <MiniCard label="Pending payment schedules" value={String(data.summary.pendingSchedules)} icon={CreditCard} />
@@ -159,7 +152,7 @@ export default function RenterWorkspaceDashboard() {
               .filter((item) => item.appliedOccurrences > 0)
               .slice(0, 8)
               .map((item) => (
-                <div key={item.ruleId} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div key={item.ruleId} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-950">{item.name}</p>
@@ -190,7 +183,7 @@ export default function RenterWorkspaceDashboard() {
           <CardContent className="space-y-3">
             {!data.rentScore.recentEvents.length ? <p className="text-sm text-muted-foreground">No score activity has been recorded yet.</p> : null}
             {data.rentScore.recentEvents.map((event) => (
-              <div key={event.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={event.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-950">{event.rule.name}</p>
@@ -215,10 +208,10 @@ export default function RenterWorkspaceDashboard() {
           <CardHeader>
             <CardTitle className="text-lg">Linked rental properties</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {!data.linkedCases.length ? <p className="text-sm text-muted-foreground">No landlord or agent property is currently linked to your renter account.</p> : null}
             {data.linkedCases.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{item.property.name}</p>
@@ -252,7 +245,7 @@ export default function RenterWorkspaceDashboard() {
           <CardContent className="space-y-3">
             {!data.shareHistory.length ? <p className="text-sm text-muted-foreground">You have not shared your rent score report yet.</p> : null}
             {data.shareHistory.slice(0, 5).map((share) => (
-              <div key={share.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={share.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-950">{share.recipientName || share.recipientEmail}</p>
@@ -286,9 +279,11 @@ export default function RenterWorkspaceDashboard() {
 
 function ScoreAction({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 md:px-4 md:py-3">
+      <div className="flex items-start justify-between gap-3 md:block">
+        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">{label}</p>
+        <p className="text-right text-sm font-medium text-slate-900 md:mt-1 md:text-left">{value}</p>
+      </div>
     </div>
   );
 }
@@ -303,11 +298,11 @@ function MiniCard({
   icon: typeof BadgeCheck;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-slate-950 md:text-2xl">{value}</p>
         </div>
         <Icon className="h-5 w-5 text-[var(--rentsure-blue)]" />
       </div>

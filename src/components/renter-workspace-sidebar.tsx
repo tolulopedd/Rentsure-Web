@@ -1,4 +1,4 @@
-import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, ReceiptText, Share2, UserCircle2 } from "lucide-react";
+import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, Share2, UserCircle2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -15,7 +15,6 @@ const items = [
   { label: "Linked Properties", to: "/account/renter/cases", icon: ClipboardList },
   { label: "Landlord Decision", to: "/account/renter/queue", icon: ListChecks },
   { label: "Payments", to: "/account/renter/payments", icon: CreditCard },
-  { label: "Buy rent score", to: "/account/renter/buy-score", icon: ReceiptText },
   { label: "Profile", to: "/account/renter/profile", icon: UserCircle2 },
   { label: "Share score", to: "/account/renter/share-score", icon: Share2 }
 ];
@@ -41,7 +40,7 @@ export function RenterWorkspaceSidebar() {
         <div className="mb-5 rounded-2xl border border-[var(--rentsure-blue-soft)] bg-[var(--rentsure-blue-soft)]/60 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Renter</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Your rent score, payment confirmations, and profile trust signals live here.
+            Your rent score, payment confirmations, linked properties, landlord decision, and profile live here.
           </p>
         </div>
 

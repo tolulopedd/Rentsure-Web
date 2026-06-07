@@ -11,12 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import {
   createWorkspaceProposedRenter,
-  createRentScorePaymentSession,
   getWorkspaceQueueItem,
   listWorkspaceProperties,
   listWorkspaceQueue,
+  requestWorkspaceRentScore,
   searchWorkspaceRenters,
-  verifyRentScorePayment,
   type QueueDetail,
   type QueueListItem,
   type WorkspaceRenterSearchResult,
@@ -31,16 +30,13 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString();
 }
 
-function formatNgn(value: number) {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
-}
-
 function renterName(item: { firstName: string; lastName: string; organizationName?: string | null }) {
   return item.organizationName || [item.firstName, item.lastName].filter(Boolean).join(" ");
 }
 
 type ProposedDraft = {
   propertyId: string;
+  propertyUnitId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -50,6 +46,7 @@ type ProposedDraft = {
 
 const emptyProposedDraft: ProposedDraft = {
   propertyId: "",
+  propertyUnitId: "",
   firstName: "",
   lastName: "",
   email: "",
@@ -67,7 +64,6 @@ export default function PublicWorkspaceQueue() {
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [showLinkForm, setShowLinkForm] = useState(false);
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [draft, setDraft] = useState<ProposedDraft>(emptyProposedDraft);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -77,6 +73,7 @@ export default function PublicWorkspaceQueue() {
   const [searchResults, setSearchResults] = useState<WorkspaceRenterSearchResult[]>([]);
   const [selectedExistingRenter, setSelectedExistingRenter] = useState<WorkspaceRenterSearchResult | null>(null);
   const [invitePreviewUrl, setInvitePreviewUrl] = useState<string | null>(null);
+  const isAgent = (localStorage.getItem("userRole") || "").toUpperCase() === "AGENT";
 
   const loadQueue = useCallback(async (nextSelectedId?: string, input?: { silent?: boolean }) => {
     try {
@@ -88,7 +85,12 @@ export default function PublicWorkspaceQueue() {
       setProperties(propertyResponse.items);
       setDraft((current) => ({
         ...current,
-        propertyId: current.propertyId || propertyResponse.items[0]?.id || ""
+        propertyId: current.propertyId || propertyResponse.items[0]?.id || "",
+        propertyUnitId:
+          current.propertyUnitId ||
+          propertyResponse.items.find((property) => property.id === (current.propertyId || propertyResponse.items[0]?.id || ""))?.units[0]?.id ||
+          propertyResponse.items[0]?.units[0]?.id ||
+          ""
       }));
       const resolvedId =
         nextSelectedId && queueResponse.items.some((item) => item.id === nextSelectedId)
@@ -136,26 +138,6 @@ export default function PublicWorkspaceQueue() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
-  useEffect(() => {
-    const search = new URLSearchParams(window.location.search);
-    const reference = search.get("rentScorePaymentRef");
-    if (!reference) return;
-
-    void (async () => {
-      try {
-        const response = await verifyRentScorePayment(reference);
-        setDetail(response);
-        await loadQueue(response.id);
-        toast.success("Payment verified. Rent score request created.");
-      } catch (error: unknown) {
-        toast.error(getErrorMessage(error, "Failed to verify rent score payment"));
-      } finally {
-        const nextUrl = `${window.location.pathname}${window.location.hash || ""}`;
-        window.history.replaceState({}, "", nextUrl);
-      }
-    })();
-  }, [loadQueue]);
-
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
@@ -172,16 +154,34 @@ export default function PublicWorkspaceQueue() {
   );
 
   const propertyOptions = useMemo(
-    () => {
-      const linkedPropertyIds = new Set(queue.map((item) => item.property.id));
-      return properties
-        .filter((property) => !linkedPropertyIds.has(property.id) || property.id === draft.propertyId)
-        .map((property) => ({ value: property.id, label: `${property.summaryLabel} · ${property.address}` }));
-    },
-    [draft.propertyId, properties, queue]
+    () => properties.map((property) => ({ value: property.id, label: `${property.summaryLabel} · ${property.address}` })),
+    [properties]
   );
 
+  const selectedProperty = useMemo(
+    () => properties.find((property) => property.id === draft.propertyId) || null,
+    [draft.propertyId, properties]
+  );
+
+  const propertyUnitOptions = useMemo(() => {
+    if (!selectedProperty) return [];
+    const pendingUnitIds = new Set(
+      queue
+        .filter((item) => !item.decision)
+        .map((item) => item.propertyUnit?.id)
+        .filter(Boolean) as string[]
+    );
+
+    return selectedProperty.units
+      .filter((unit) => !pendingUnitIds.has(unit.id) || unit.id === draft.propertyUnitId)
+      .map((unit) => ({
+        value: unit.id,
+        label: `${unit.label} · ${unit.bedroomCount} bed · ${unit.bathroomCount} bath`
+      }));
+  }, [draft.propertyUnitId, queue, selectedProperty]);
+
   function resetSearchFlow(nextPropertyId?: string) {
+    const nextSelectedProperty = properties.find((property) => property.id === (nextPropertyId ?? draft.propertyId)) || null;
     setSearchQuery("");
     setSearchLoading(false);
     setSearchPerformed(false);
@@ -190,13 +190,18 @@ export default function PublicWorkspaceQueue() {
     setInvitePreviewUrl(null);
     setDraft({
       ...emptyProposedDraft,
-      propertyId: nextPropertyId ?? draft.propertyId
+      propertyId: nextPropertyId ?? draft.propertyId,
+      propertyUnitId: nextSelectedProperty?.units[0]?.id || ""
     });
   }
 
   async function searchRenterDirectory() {
     if (!draft.propertyId) {
       toast.error("Select a property first.");
+      return;
+    }
+    if (!draft.propertyUnitId) {
+      toast.error("Select a unit first.");
       return;
     }
     if (searchQuery.trim().length < 2) {
@@ -208,7 +213,7 @@ export default function PublicWorkspaceQueue() {
       setSearchLoading(true);
       setSearchPerformed(true);
       setSelectedExistingRenter(null);
-      const response = await searchWorkspaceRenters(draft.propertyId, searchQuery.trim());
+      const response = await searchWorkspaceRenters(draft.propertyId, draft.propertyUnitId, searchQuery.trim());
       setSearchResults(response.items);
       if (!response.items.length) {
         setDraft((current) => ({
@@ -240,8 +245,8 @@ export default function PublicWorkspaceQueue() {
       toast.error("Select a property.");
       return;
     }
-    if (queue.some((item) => item.property.id === draft.propertyId)) {
-      toast.error("This property is already linked to a renter.");
+    if (!draft.propertyUnitId) {
+      toast.error("Select a unit.");
       return;
     }
     const isExistingMember = Boolean(selectedExistingRenter);
@@ -270,6 +275,7 @@ export default function PublicWorkspaceQueue() {
     try {
       const response = await createWorkspaceProposedRenter({
         propertyId: draft.propertyId,
+        propertyUnitId: draft.propertyUnitId,
         renterAccountId: selectedExistingRenter?.id,
         firstName: draft.firstName,
         lastName: draft.lastName,
@@ -282,7 +288,6 @@ export default function PublicWorkspaceQueue() {
       await loadQueue(response.id);
       setDetail(response);
       setShowLinkForm(false);
-      setShowPaymentOptions(false);
       toast.success(
         isExistingMember
           ? "Existing renter linked. They can review this request from their RentSure dashboard."
@@ -293,41 +298,26 @@ export default function PublicWorkspaceQueue() {
     }
   }
 
-  async function startRentScorePayment(provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER") {
+  async function requestRentScore() {
     if (!detail) return;
     try {
-      const response = await createRentScorePaymentSession(detail.id, {
-        provider,
-        notes: detail.notes || undefined,
-        callbackPath: window.location.pathname
-      });
-      if (response.checkoutUrl) {
-        window.location.assign(response.checkoutUrl);
-        return;
-      }
+      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadDetail(detail.id);
       await loadQueue(detail.id);
-      setShowPaymentOptions(false);
-      toast.success("Transfer instructions created. Admin will confirm once payment is received.");
+      setDetail(response);
+      toast.success("Rent score requested.");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to start rent score payment"));
+      toast.error(getErrorMessage(error, "Failed to request rent score"));
     }
   }
 
   const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
-  const paymentPending = detail?.latestRentScorePayment && !detail.scoreRequests.length ? detail.latestRentScorePayment : null;
-  const requestButtonLabel = detail?.scoreRequests.length
-    ? "Rent score requested"
-    : paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION"
-      ? "Awaiting admin confirmation"
-      : paymentPending?.status === "PENDING_ACTION"
-        ? "Complete payment"
-        : "Request rent score";
+  const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Link tenant to your property</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Link tenant to your property</h1>
         <Button
           type="button"
           variant="outline"
@@ -365,7 +355,12 @@ export default function PublicWorkspaceQueue() {
               <Select
                 value={draft.propertyId}
                 onValueChange={(value) => {
-                  setDraft((current) => ({ ...current, propertyId: value }));
+                  const nextProperty = properties.find((property) => property.id === value) || null;
+                  setDraft((current) => ({
+                    ...current,
+                    propertyId: value,
+                    propertyUnitId: nextProperty?.units[0]?.id || ""
+                  }));
                   resetSearchFlow(value);
                 }}
                 disabled={!properties.length}
@@ -382,7 +377,29 @@ export default function PublicWorkspaceQueue() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="space-y-2">
+              <Label>Unit</Label>
+              <Select
+                value={draft.propertyUnitId}
+                onValueChange={(value) => setDraft((current) => ({ ...current, propertyUnitId: value }))}
+                disabled={!selectedProperty || !propertyUnitOptions.length}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {propertyUnitOptions.map((unit) => (
+                    <SelectItem key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedProperty && !propertyUnitOptions.length ? (
+                <p className="text-xs text-amber-700">All units in this property already have pending renters.</p>
+              ) : null}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
               <p className="text-sm font-semibold text-slate-950">Search</p>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                 <Input
@@ -408,7 +425,7 @@ export default function PublicWorkspaceQueue() {
                     type="button"
                     disabled={result.alreadyQueued}
                     onClick={() => useExistingRenter(result)}
-                    className={`w-full rounded-2xl border p-4 text-left transition ${
+                    className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
                       selectedExistingRenter?.id === result.id
                         ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/50"
                         : "border-slate-200 bg-white hover:bg-slate-50"
@@ -433,7 +450,7 @@ export default function PublicWorkspaceQueue() {
             ) : null}
 
             {selectedExistingRenter ? (
-              <div className="rounded-2xl border border-blue-200 bg-[var(--rentsure-blue-soft)]/40 p-4">
+              <div className="rounded-2xl border border-blue-200 bg-[var(--rentsure-blue-soft)]/40 p-3 md:p-4">
                 <p className="text-sm font-semibold text-slate-950">Selected renter</p>
                 <p className="mt-2 text-sm text-slate-700">{renterName(selectedExistingRenter)}</p>
                 <p className="text-sm text-slate-600">{selectedExistingRenter.email} · {selectedExistingRenter.phone}</p>
@@ -470,7 +487,7 @@ export default function PublicWorkspaceQueue() {
         </Card>
       ) : null}
 
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Linked tenants</CardTitle>
@@ -492,10 +509,14 @@ export default function PublicWorkspaceQueue() {
                       : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto] sm:items-center">
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
                       <p className="truncate font-semibold text-slate-950">{item.property.summaryLabel}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
+                      <p className="truncate font-medium text-slate-700">{item.propertyUnit?.summaryLabel || item.propertyUnit?.label || "-"}</p>
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
@@ -516,7 +537,7 @@ export default function PublicWorkspaceQueue() {
             <CardHeader>
               <CardTitle className="text-lg">Property-tenant details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-4 md:space-y-5">
               {detailLoading ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
               {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to manage their record.</p> : null}
               {detail ? (
@@ -553,15 +574,21 @@ export default function PublicWorkspaceQueue() {
                           <p className="text-sm text-slate-500">Profile details pending</p>
                         )}
                       </div>
-                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Rent score</p>
-                        <p className="text-sm text-slate-600">
-                          {detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
-                        </p>
-                      </div>
+                      {!isAgent ? (
+                        <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Rent score</p>
+                          <p className="text-sm text-slate-600">
+                            {detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
+                          </p>
+                        </div>
+                      ) : null}
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
                         <p className="text-sm text-slate-600">{detail.property.summaryLabel}</p>
+                      </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
+                        <p className="text-sm text-slate-600">{detail.propertyUnit?.summaryLabel || detail.propertyUnit?.label || "-"}</p>
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property address</p>
@@ -571,57 +598,11 @@ export default function PublicWorkspaceQueue() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <Button
-                      onClick={() => {
-                        if (paymentPending?.checkoutUrl) {
-                          window.location.assign(paymentPending.checkoutUrl);
-                          return;
-                        }
-                        setShowPaymentOptions((current) => !current);
-                      }}
-                      disabled={!canRequestScore && !paymentPending?.checkoutUrl}
-                      className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
-                    >
+                    <Button onClick={() => void requestRentScore()} disabled={!canRequestScore} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
                       <ArrowRight className="mr-2 h-4 w-4" />
                       {requestButtonLabel}
                     </Button>
                   </div>
-
-                  {showPaymentOptions && canRequestScore ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-950">Choose payment method</p>
-                      <p className="mt-1 text-sm text-slate-600">Complete payment before the rent score review starts.</p>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <Button variant="outline" onClick={() => void startRentScorePayment("PAYSTACK")}>
-                          Paystack
-                        </Button>
-                        <Button variant="outline" onClick={() => void startRentScorePayment("FLUTTERWAVE")}>
-                          Flutterwave
-                        </Button>
-                        <Button variant="outline" onClick={() => void startRentScorePayment("MANUAL_TRANSFER")}>
-                          Cash / transfer
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION" && paymentPending.manualTransfer ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                      <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-[180px_minmax(0,1fr)]">
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Amount</p>
-                        <p>{formatNgn(paymentPending.amountNgn)}</p>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Bank</p>
-                        <p>{paymentPending.manualTransfer.bankName}</p>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Account name</p>
-                        <p>{paymentPending.manualTransfer.accountName}</p>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Account number</p>
-                        <p>{paymentPending.manualTransfer.accountNumber}</p>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Reference</p>
-                        <p>{paymentPending.manualTransfer.reference}</p>
-                      </div>
-                      <p className="mt-3 text-sm text-slate-600">{paymentPending.manualTransfer.instructions}</p>
-                    </div>
-                  ) : null}
 
                   <div className="space-y-3">
                     <p className="text-sm font-semibold text-slate-950">Rent score requests</p>

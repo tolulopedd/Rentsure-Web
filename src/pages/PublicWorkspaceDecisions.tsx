@@ -8,12 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import {
-  createRentScorePaymentSession,
   decideWorkspaceProposedRenter,
   forwardWorkspaceScoreRequest,
   getWorkspaceQueueItem,
   listWorkspaceQueue,
-  verifyRentScorePayment,
+  requestWorkspaceRentScore,
   type ProposedRenterDecision,
   type QueueDetail,
   type QueueListItem
@@ -72,7 +71,6 @@ export default function PublicWorkspaceDecisions() {
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
-  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
 
@@ -134,27 +132,6 @@ export default function PublicWorkspaceDecisions() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
-  useEffect(() => {
-    const search = new URLSearchParams(window.location.search);
-    const reference = search.get("rentScorePaymentRef");
-    if (!reference) return;
-
-    void (async () => {
-      try {
-        const response = await verifyRentScorePayment(reference);
-        setDetail(response);
-        setDecisionNote(response.decision?.note || "");
-        await loadQueue(response.id);
-        toast.success("Payment verified. Rent score request created.");
-      } catch (error: unknown) {
-        toast.error(getErrorMessage(error, "Failed to verify rent score payment"));
-      } finally {
-        const nextUrl = `${window.location.pathname}${window.location.hash || ""}`;
-        window.history.replaceState({}, "", nextUrl);
-      }
-    })();
-  }, [loadQueue]);
-
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
@@ -170,24 +147,16 @@ export default function PublicWorkspaceDecisions() {
     }
   );
 
-  async function startRentScorePayment(provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER") {
+  async function requestRentScore() {
     if (!detail) return;
     try {
-      const response = await createRentScorePaymentSession(detail.id, {
-        provider,
-        notes: detail.notes || undefined,
-        callbackPath: window.location.pathname
-      });
-      if (response.checkoutUrl) {
-        window.location.assign(response.checkoutUrl);
-        return;
-      }
-      await loadDetail(detail.id);
+      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadQueue(detail.id);
-      setShowPaymentOptions(false);
-      toast.success("Transfer instructions created. Admin will confirm once payment is received.");
+      setDetail(response);
+      setDecisionNote(response.decision?.note || "");
+      toast.success("Rent score requested.");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to start rent score payment"));
+      toast.error(getErrorMessage(error, "Failed to request rent score"));
     }
   }
 
@@ -323,22 +292,15 @@ export default function PublicWorkspaceDecisions() {
   }
 
   const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
-  const paymentPending = detail?.latestRentScorePayment && !detail.scoreRequests.length ? detail.latestRentScorePayment : null;
-  const requestButtonLabel = detail?.scoreRequests.length
-    ? "Rent score requested"
-    : paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION"
-      ? "Awaiting admin confirmation"
-      : paymentPending?.status === "PENDING_ACTION"
-        ? "Complete payment"
-        : "Request rent score";
+  const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Landlord Decision</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Landlord Decision</h1>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Linked tenants</CardTitle>
@@ -351,7 +313,7 @@ export default function PublicWorkspaceDecisions() {
                   key={item.id}
                   type="button"
                   onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                  className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
                     selectedId === item.id
                       ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
                       : "border-slate-200 bg-white hover:bg-slate-50"
@@ -360,13 +322,17 @@ export default function PublicWorkspaceDecisions() {
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                     <div className="space-y-2">
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                          <p className="font-semibold text-slate-950">{item.property.summaryLabel}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
-                          <p className="font-semibold text-slate-950">{renterName(item)}</p>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
+                        <p className="font-semibold text-slate-950">{item.property.summaryLabel}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
+                        <p className="font-medium text-slate-700">{item.propertyUnit?.summaryLabel || item.propertyUnit?.label || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
+                        <p className="font-semibold text-slate-950">{renterName(item)}</p>
                         </div>
                         <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
                           {decisionLabel(item.decision?.decision || item.status)}
@@ -374,10 +340,12 @@ export default function PublicWorkspaceDecisions() {
                       </div>
                     </div>
                     <div className="space-y-2 text-sm text-slate-600">
-                      <SummaryRow
-                        label="Rent score"
-                        value={item.linkedRentScore ? `${item.linkedRentScore.score} / 900` : "In progress"}
-                      />
+                      {!isAgent ? (
+                        <SummaryRow
+                          label="Rent score"
+                          value={item.linkedRentScore ? `${item.linkedRentScore.score} / 900` : "In progress"}
+                        />
+                      ) : null}
                       <SummaryRow label="Decision" value={decisionLabel(item.decision?.decision || item.status)} />
                     </div>
                   </div>
@@ -395,7 +363,7 @@ export default function PublicWorkspaceDecisions() {
               {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to continue.</p> : null}
                 {detail ? (
                   <>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <p className="font-semibold text-slate-950">{renterName(detail)}</p>
@@ -407,26 +375,23 @@ export default function PublicWorkspaceDecisions() {
                           <SummaryRow label="Email" value={detail.email} />
                           <SummaryRow label="Phone" value={detail.phone} />
                           <SummaryRow label="Property" value={detail.property.summaryLabel} />
+                          <SummaryRow label="Unit" value={detail.propertyUnit?.summaryLabel || detail.propertyUnit?.label || "-"} />
                           <SummaryRow label="Address" value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`} />
-                          <SummaryRow
-                            label="Rent score"
-                            value={detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
-                          />
+                          {!isAgent ? (
+                            <SummaryRow
+                              label="Rent score"
+                              value={detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                       <div className="flex flex-wrap gap-3">
                         <Button
-                          onClick={() => {
-                            if (paymentPending?.checkoutUrl) {
-                              window.location.assign(paymentPending.checkoutUrl);
-                              return;
-                            }
-                            setShowPaymentOptions((current) => !current);
-                          }}
-                          disabled={!canRequestScore && !paymentPending?.checkoutUrl}
+                          onClick={() => void requestRentScore()}
+                          disabled={!canRequestScore}
                           className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
                         >
                           <ArrowRight className="mr-2 h-4 w-4" />
@@ -442,47 +407,20 @@ export default function PublicWorkspaceDecisions() {
                             {detail.scoreRequests[0]?.status === "FORWARDED" ? "Forwarded to landlord" : "Forward report to landlord"}
                           </Button>
                         ) : null}
-                        <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport || !detail.decision}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Download report
-                        </Button>
+                        {!isAgent ? (
+                          <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport || !detail.decision}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download report
+                          </Button>
+                        ) : null}
                       </div>
-                      {showPaymentOptions && canRequestScore ? (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-sm font-semibold text-slate-950">Choose payment method</p>
-                          <p className="mt-1 text-sm text-slate-600">Complete payment before the rent score review starts.</p>
-                          <div className="mt-4 flex flex-wrap gap-3">
-                            <Button variant="outline" onClick={() => void startRentScorePayment("PAYSTACK")}>
-                              Paystack
-                            </Button>
-                            <Button variant="outline" onClick={() => void startRentScorePayment("FLUTTERWAVE")}>
-                              Flutterwave
-                            </Button>
-                            <Button variant="outline" onClick={() => void startRentScorePayment("MANUAL_TRANSFER")}>
-                              Cash / transfer
-                            </Button>
-                          </div>
-                        </div>
-                      ) : null}
-                      {paymentPending?.status === "AWAITING_MANUAL_CONFIRMATION" && paymentPending.manualTransfer ? (
-                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                          <div className="space-y-2 text-sm text-slate-700">
-                            <SummaryRow label="Amount" value={formatNgn(paymentPending.amountNgn)} />
-                            <SummaryRow label="Bank" value={paymentPending.manualTransfer.bankName} />
-                            <SummaryRow label="Account name" value={paymentPending.manualTransfer.accountName} />
-                            <SummaryRow label="Account number" value={paymentPending.manualTransfer.accountNumber} />
-                            <SummaryRow label="Reference" value={paymentPending.manualTransfer.reference} />
-                          </div>
-                          <p className="mt-3 text-sm text-slate-600">{paymentPending.manualTransfer.instructions}</p>
-                        </div>
-                      ) : null}
-                      {!detail.decision ? (
+                      {!detail.decision && !isAgent ? (
                         <p className="mt-3 text-sm text-slate-500">Download report unlocks after a landlord decision is made.</p>
                       ) : null}
                     </div>
 
                     {detail.decision ? (
-                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                         <div className="space-y-2 text-sm text-slate-600">
                           <SummaryRow label="Decision" value={detail.decision.decision} />
                           <SummaryRow
@@ -499,7 +437,7 @@ export default function PublicWorkspaceDecisions() {
                     ) : null}
 
                     {isLandlord ? (
-                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                         {!detail.linkedRentScoreReport ? (
                           <p className="text-sm text-slate-500">
                             Decision actions unlock once the rent score report is ready.

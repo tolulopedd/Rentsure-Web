@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getErrorMessage } from "@/lib/errors";
-import {
-  approveRentScoreReport,
-  listAdminLandlordAgentActivities,
-  type AdminLandlordAgentActivityItem
-} from "@/lib/rent-score-api";
+import { listAdminLandlordAgentActivities, type AdminLandlordAgentActivityItem } from "@/lib/rent-score-api";
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -26,14 +21,13 @@ function approvalBadgeClass(status: AdminLandlordAgentActivityItem["shareApprova
 
 function approvalLabel(status: AdminLandlordAgentActivityItem["shareApproval"]["status"]) {
   if (status === "APPROVED") return "Approved";
-  if (status === "PENDING") return "Waiting for admin";
+  if (status === "PENDING") return "Pending";
   return "No request";
 }
 
 export default function AdminLandlordAgentActivitiesPage() {
   const [items, setItems] = useState<AdminLandlordAgentActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   async function loadItems() {
     try {
@@ -52,24 +46,11 @@ export default function AdminLandlordAgentActivitiesPage() {
     void loadItems();
   }, []);
 
-  async function approve(paymentId: string) {
-    try {
-      setApprovingId(paymentId);
-      await approveRentScoreReport(paymentId);
-      await loadItems();
-      toast.success("Rent score report approved");
-    } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to approve rent score report"));
-    } finally {
-      setApprovingId(null);
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-950">Landlord and agent activities</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Review property-link activity and approve rent score sharing for decisions.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Review property-link activity and current rent score request progress.</p>
       </div>
 
       <Card className="border-slate-200 shadow-sm">
@@ -91,8 +72,7 @@ export default function AdminLandlordAgentActivitiesPage() {
                     <TableHead>Property</TableHead>
                     <TableHead>Renter</TableHead>
                     <TableHead>Activity</TableHead>
-                    <TableHead>Share approval</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead>Score request</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -137,19 +117,6 @@ export default function AdminLandlordAgentActivitiesPage() {
                             </div>
                           ) : null}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.latestRentScorePayment && item.shareApproval.canApprove ? (
-                          <Button
-                            className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
-                            disabled={approvingId === item.latestRentScorePayment.id}
-                            onClick={() => void approve(item.latestRentScorePayment!.id)}
-                          >
-                            {approvingId === item.latestRentScorePayment.id ? "Approving..." : "Approve report"}
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
                       </TableCell>
                     </TableRow>
                   ))}
