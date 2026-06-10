@@ -12,7 +12,7 @@ import { publicFetch } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { usePageSeo } from "@/lib/usePageSeo";
 
-type SignupTrack = "RENTER" | "PROPERTY";
+type SignupTrack = "RENTER" | "LANDLORD" | "AGENT";
 type SignupEntity = "INDIVIDUAL" | "COMPANY";
 
 type SignupFormState = {
@@ -48,7 +48,8 @@ function isValidEmail(value: string) {
 
 function initialForm(searchParams: URLSearchParams): SignupFormState {
   const trackParam = searchParams.get("track")?.trim().toUpperCase();
-  const nextTrack: SignupTrack = trackParam === "RENTER" ? "RENTER" : "PROPERTY";
+  const nextTrack: SignupTrack =
+    trackParam === "RENTER" ? "RENTER" : trackParam === "AGENT" ? "AGENT" : "LANDLORD";
 
   return {
     track: nextTrack,
@@ -99,7 +100,7 @@ export default function Signup() {
       const response = await publicFetch<SignupResponse>("/api/auth/signup", {
         method: "POST",
         body: JSON.stringify({
-          accountType: form.track === "RENTER" ? "RENTER" : "LANDLORD",
+          accountType: form.track,
           entityType: form.entityType,
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
@@ -224,7 +225,8 @@ export default function Signup() {
                       </SelectTrigger>
                       <SelectContent className="bg-white">
                         <SelectItem value="RENTER">Renter</SelectItem>
-                        <SelectItem value="PROPERTY">Landlord / Agent</SelectItem>
+                        <SelectItem value="LANDLORD">Landlord</SelectItem>
+                        <SelectItem value="AGENT">Agent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
