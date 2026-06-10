@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
+import {
+  addressSearchMatches,
+  formatNigeriaAddressSuggestion,
+  formatNigeriaFallbackAddress,
+  NIGERIA_ADDRESS_PLACEHOLDER
+} from "@/lib/nigeria-address";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 
 type MapboxAddressFieldsProps = {
@@ -23,10 +29,6 @@ function mapboxCityLabel(suggestion: MapboxSearchSuggestion) {
 
 function mapboxStateLabel(suggestion: MapboxSearchSuggestion) {
   return suggestion.context?.region?.name || "";
-}
-
-function mapboxAddressLabel(suggestion: MapboxSearchSuggestion) {
-  return suggestion.full_address || suggestion.address || suggestion.name_preferred || suggestion.name || "";
 }
 
 export function MapboxAddressFields({
@@ -70,12 +72,12 @@ export function MapboxAddressFields({
   }, [cityQuery, stateValue]);
 
   const filteredAddresses = useMemo(() => {
-    const query = addressValue.trim().toLowerCase();
+    const query = addressValue.trim();
     return Array.from(
       new Map(
         fallbackNigeriaAddressSuggestions
           .filter((item) => (!stateValue || item.state === stateValue) && (!cityValue || item.city === cityValue))
-          .filter((item) => !query || item.value.toLowerCase().includes(query))
+          .filter((item) => !query || addressSearchMatches(item.value, query))
           .map((item) => [item.value, item])
       ).values()
     ).slice(0, 6);
@@ -151,7 +153,7 @@ export function MapboxAddressFields({
           accessToken: mapboxAccessToken,
           query: [query, cityValue, stateValue].filter(Boolean).join(" "),
           sessionToken: searchSessionToken,
-          types: ["address", "street"],
+          types: ["address", "street", "poi"],
           limit: 6
         });
 
@@ -197,13 +199,13 @@ export function MapboxAddressFields({
   const visibleAddressSuggestions = useMemo(() => {
     const mapboxItems = addressSuggestions.map((suggestion) => ({
       key: suggestion.mapbox_id,
-      address: mapboxAddressLabel(suggestion),
+      address: formatNigeriaAddressSuggestion(suggestion, { city: cityValue, state: stateValue }),
       city: mapboxCityLabel(suggestion) || cityValue,
       state: mapboxStateLabel(suggestion) || stateValue
     }));
     const fallbackItems = filteredAddresses.map((suggestion) => ({
       key: `fallback-${suggestion.value}`,
-      address: suggestion.value,
+      address: formatNigeriaFallbackAddress(suggestion.value, suggestion.city, suggestion.state),
       city: suggestion.city,
       state: suggestion.state
     }));
@@ -263,9 +265,9 @@ export function MapboxAddressFields({
               setShowAddressLov(true);
             }}
             onFocus={() => setShowAddressLov(true)}
-            placeholder={cityValue ? `Start typing an address in ${cityValue}` : "Start typing an address"}
+            placeholder={NIGERIA_ADDRESS_PLACEHOLDER}
           />
-          {showAddressLov ? (
+          {showAddressLov && (addressLookupLoading || visibleAddressSuggestions.length > 0) ? (
             <LovPanel>
               {addressLookupLoading ? <LovEmpty text="Searching address suggestions..." /> : null}
               {!addressLookupLoading && visibleAddressSuggestions.length ? (
@@ -282,15 +284,6 @@ export function MapboxAddressFields({
                     ) : null}
                   </LovButton>
                 ))
-              ) : null}
-              {!addressLookupLoading && !visibleAddressSuggestions.length ? (
-                <LovEmpty
-                  text={
-                    mapboxAccessToken
-                      ? "No address suggestion matched yet. Keep typing to refine the address."
-                      : "Set VITE_MAPBOX_ACCESS_TOKEN to use live address suggestions."
-                  }
-                />
               ) : null}
             </LovPanel>
           ) : null}
