@@ -85,6 +85,15 @@ export type WorkspaceProfileResponse = {
     createdAt: string;
     updatedAt: string;
   };
+  linkedAccounts: Array<{
+    accountId: string;
+    accountType: "LANDLORD" | "AGENT";
+    name: string;
+    email: string;
+    phone: string;
+    propertyCount: number;
+    properties: string[];
+  }>;
 };
 
 export type LinkedRentScoreSummary = {
@@ -107,6 +116,16 @@ export type QueueListItem = {
   state: string;
   status: ProposedRenterStatus;
   property: WorkspaceProperty;
+  propertyUnit: {
+    id: string;
+    label: string;
+    summaryLabel?: string | null;
+    address: string;
+    city: string;
+    state: string;
+    bedroomCount: number;
+    bathroomCount: number;
+  } | null;
   linkedRentScore: LinkedRentScoreSummary;
   decision: {
     decision: ProposedRenterDecision;
@@ -202,6 +221,20 @@ export type QueueDetail = {
     } | null;
   } | null;
   property: WorkspaceProperty;
+  propertyUnit: {
+    id: string;
+    label: string;
+    summaryLabel?: string | null;
+    address: string;
+    city: string;
+    state: string;
+    bedroomCount: number;
+    bathroomCount: number;
+    isOccupied: boolean;
+    currentTenantName?: string | null;
+    currentTenantEmail?: string | null;
+    currentTenantPhone?: string | null;
+  } | null;
   scoreRequests: Array<{
     id: string;
     status: ScoreRequestStatus;
@@ -239,6 +272,7 @@ export type QueueDetail = {
       instructions: string;
     } | null;
   } | null;
+  availableRentScorePaymentProviders: RentScorePaymentProvider[];
   paymentSchedules: Array<{
     id: string;
     paymentType: PaymentScheduleType;
@@ -407,6 +441,35 @@ export function createWorkspaceProperty(input: {
   });
 }
 
+export function updateWorkspaceProperty(
+  propertyId: string,
+  input: {
+    name: string;
+    ownerName: string;
+    landlordEmail: string;
+    propertyType: "Duplex" | "Flats" | "Self Contain" | "Mansion" | "Boys Quater";
+    bedroomCount: number;
+    bathroomCount: number;
+    address: string;
+    state: string;
+    city: string;
+    units: Array<{
+      label: string;
+      bedroomCount: number;
+      bathroomCount: number;
+      isOccupied: boolean;
+      currentTenantName?: string;
+      currentTenantEmail?: string;
+      currentTenantPhone?: string;
+    }>;
+  }
+) {
+  return apiFetch<{ items: WorkspaceProperty[] }>(`/api/workspace/properties/${encodeURIComponent(propertyId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input)
+  });
+}
+
 export function shareWorkspaceProperty(propertyId: string, sharedWithEmail: string) {
   return apiFetch<{ items: WorkspaceProperty[] }>(`/api/workspace/properties/${encodeURIComponent(propertyId)}/share`, {
     method: "POST",
@@ -422,9 +485,10 @@ export function getWorkspaceQueueItem(id: string) {
   return apiFetch<QueueDetail>(`/api/workspace/queue/${encodeURIComponent(id)}`);
 }
 
-export function searchWorkspaceRenters(propertyId: string, q: string) {
+export function searchWorkspaceRenters(propertyId: string, propertyUnitId: string, q: string) {
   const search = new URLSearchParams({
     propertyId,
+    propertyUnitId,
     q
   });
   return apiFetch<{ items: WorkspaceRenterSearchResult[] }>(`/api/workspace/renter-search?${search.toString()}`);
@@ -432,6 +496,7 @@ export function searchWorkspaceRenters(propertyId: string, q: string) {
 
 export function createWorkspaceProposedRenter(input: {
   propertyId: string;
+  propertyUnitId: string;
   renterAccountId?: string;
   firstName: string;
   lastName: string;

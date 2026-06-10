@@ -8,12 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getErrorMessage } from "@/lib/errors";
+import {
+  addressSearchMatches,
+  formatNigeriaAddressSuggestion,
+  formatNigeriaFallbackAddress,
+  NIGERIA_ADDRESS_PLACEHOLDER
+} from "@/lib/nigeria-address";
 import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 import {
   createWorkspaceProperty,
   listWorkspaceProperties,
   shareWorkspaceProperty,
+  updateWorkspaceProperty,
   type WorkspaceProperty
 } from "@/lib/public-workspace-api";
 
@@ -75,6 +82,7 @@ export default function PublicWorkspaceProperties() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
   const [stateQuery, setStateQuery] = useState("");
   const [cityQuery, setCityQuery] = useState("");
   const [showStateLov, setShowStateLov] = useState(false);
@@ -118,8 +126,46 @@ export default function PublicWorkspaceProperties() {
   function resetForm() {
     setDraft(createInitialDraft());
     setShowAddForm(false);
+    setEditingPropertyId(null);
     setStateQuery("");
     setCityQuery("");
+    setShowStateLov(false);
+    setShowCityLov(false);
+    setShowAddressLov(false);
+    setCitySuggestions([]);
+    setAddressSuggestions([]);
+    setSearchSessionToken(crypto.randomUUID());
+  }
+
+  function draftFromProperty(property: WorkspaceProperty): PropertyDraft {
+    return {
+      name: property.name,
+      ownerName: property.ownerName,
+      landlordEmail: property.landlordEmail,
+      propertyType: (property.propertyType as PropertyType) || "Flats",
+      state: property.state,
+      city: property.city,
+      address: property.address,
+      units: property.units.length
+        ? property.units.map((unit) => ({
+            label: unit.label,
+            bedroomCount: unit.bedroomCount,
+            bathroomCount: unit.bathroomCount,
+            isOccupied: unit.isOccupied,
+            currentTenantName: unit.currentTenantName || "",
+            currentTenantEmail: unit.currentTenantEmail || "",
+            currentTenantPhone: unit.currentTenantPhone || ""
+          }))
+        : createInitialDraft().units
+    };
+  }
+
+  function startEditingProperty(property: WorkspaceProperty) {
+    setDraft(draftFromProperty(property));
+    setEditingPropertyId(property.id);
+    setShowAddForm(true);
+    setStateQuery(property.state);
+    setCityQuery(property.city);
     setShowStateLov(false);
     setShowCityLov(false);
     setShowAddressLov(false);
@@ -138,10 +184,6 @@ export default function PublicWorkspaceProperties() {
 
   function mapboxStateLabel(suggestion: MapboxSearchSuggestion) {
     return suggestion.context?.region?.name || "";
-  }
-
-  function mapboxAddressLabel(suggestion: MapboxSearchSuggestion) {
-    return suggestion.address || suggestion.name || suggestion.full_address || "";
   }
 
   function mapboxResolvedCity(suggestion: MapboxSearchSuggestion) {
@@ -170,12 +212,12 @@ export default function PublicWorkspaceProperties() {
   }, [cityQuery, draft.state]);
 
   const filteredAddresses = useMemo(() => {
-    const query = draft.address.trim().toLowerCase();
+    const query = draft.address.trim();
     return Array.from(
       new Map(
         fallbackNigeriaAddressSuggestions
           .filter((item) => (!draft.state || item.state === draft.state) && (!draft.city || item.city === draft.city))
-          .filter((item) => !query || item.value.toLowerCase().includes(query))
+          .filter((item) => !query || addressSearchMatches(item.value, query))
           .map((item) => [item.value, item])
       ).values()
     ).slice(0, 6);
@@ -255,7 +297,7 @@ export default function PublicWorkspaceProperties() {
           accessToken: mapboxAccessToken,
           query: [query, draft.city, draft.state].filter(Boolean).join(" "),
           sessionToken: searchSessionToken,
-          types: ["address", "street"],
+          types: ["address", "street", "poi"],
           limit: 6
         });
 
@@ -393,7 +435,7 @@ export default function PublicWorkspaceProperties() {
     return null;
   }
 
-  async function createProperty() {
+  async function saveProperty() {
     const validationError = validateDraft();
     if (validationError) {
       toast.error(validationError);
@@ -402,7 +444,7 @@ export default function PublicWorkspaceProperties() {
 
     try {
       setSaving(true);
-      const response = await createWorkspaceProperty({
+      const payload = {
         name: draft.name.trim(),
         ownerName: draft.ownerName.trim(),
         landlordEmail: draft.landlordEmail.trim(),
@@ -421,14 +463,21 @@ export default function PublicWorkspaceProperties() {
           currentTenantEmail: unit.isOccupied ? unit.currentTenantEmail.trim() : undefined,
           currentTenantPhone: unit.isOccupied ? unit.currentTenantPhone.trim() : undefined
         }))
-      });
+      };
 
-      setItems(response.properties);
-      setDraft(createInitialDraft());
-      setShowAddForm(false);
-      toast.success("Property added to workspace");
+      if (editingPropertyId) {
+        const response = await updateWorkspaceProperty(editingPropertyId, payload);
+        setItems(response.items);
+        toast.success("Property updated");
+      } else {
+        const response = await createWorkspaceProperty(payload);
+        setItems(response.properties);
+        toast.success("Property added to workspace");
+      }
+
+      resetForm();
     } catch (saveError: unknown) {
-      toast.error(getErrorMessage(saveError, "Failed to create property"));
+      toast.error(getErrorMessage(saveError, editingPropertyId ? "Failed to update property" : "Failed to create property"));
     } finally {
       setSaving(false);
     }
@@ -466,47 +515,57 @@ export default function PublicWorkspaceProperties() {
   const visibleAddressSuggestions = addressSuggestions.length
     ? addressSuggestions.map((suggestion) => ({
         key: suggestion.mapbox_id,
-        address: mapboxAddressLabel(suggestion),
+        address: formatNigeriaAddressSuggestion(suggestion, { city: draft.city, state: draft.state }),
         city: mapboxResolvedCity(suggestion) || draft.city,
         state: mapboxStateLabel(suggestion) || draft.state
       }))
     : filteredAddresses.map((suggestion) => ({
         key: suggestion.value,
-        address: suggestion.value,
+        address: formatNigeriaFallbackAddress(suggestion.value, suggestion.city, suggestion.state),
         city: suggestion.city,
         state: suggestion.state
       }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Properties</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Properties</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Track each linked property by location. Add one property per address, then add another entry when you want
-            to capture a different building, a new location, or another same-location property separately.
+            {isLandlord
+              ? "Track each linked property by location. Add one property per address, then add another entry when you want to capture a different building, a new location, or another same-location property separately."
+              : "Track the properties your linked landlords have attached to your workspace."}
           </p>
         </div>
 
-        <Button
-          onClick={() => setShowAddForm((current) => !current)}
-          className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
-        >
-          {showAddForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-          {showAddForm ? "Close form" : "Add property"}
-        </Button>
+        {isLandlord ? (
+          <Button
+            onClick={() => {
+              if (showAddForm) {
+                resetForm();
+                return;
+              }
+
+              setShowAddForm(true);
+            }}
+            className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+          >
+            {showAddForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+            {showAddForm ? "Close form" : "Add property"}
+          </Button>
+        ) : null}
       </div>
 
-      {showAddForm ? (
+      {showAddForm && isLandlord ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Add property</CardTitle>
+            <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Add property"}</CardTitle>
             <p className="text-sm text-muted-foreground">
               Capture one property location at a time. If the property is already occupied, add the current tenant
               details so the record is easier to identify later.
             </p>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4 md:space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
                 label="Property description"
@@ -624,7 +683,14 @@ export default function PublicWorkspaceProperties() {
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Address</Label>
-                <div className="relative">
+                <div
+                  className="relative"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setShowAddressLov(false);
+                    }
+                  }}
+                >
                   <Input
                     className="bg-white"
                     value={draft.address}
@@ -633,9 +699,9 @@ export default function PublicWorkspaceProperties() {
                       setShowAddressLov(true);
                     }}
                     onFocus={() => setShowAddressLov(true)}
-                    placeholder={draft.city ? `Start typing an address in ${draft.city}` : "Start typing an address"}
+                    placeholder={NIGERIA_ADDRESS_PLACEHOLDER}
                   />
-                  {showAddressLov ? (
+                  {showAddressLov && (addressLookupLoading || visibleAddressSuggestions.length > 0) ? (
                     <LovPanel>
                       {addressLookupLoading ? <LovEmpty text="Searching address suggestions..." /> : null}
                       {!addressLookupLoading && visibleAddressSuggestions.length ? (
@@ -650,15 +716,6 @@ export default function PublicWorkspaceProperties() {
                             </span>
                           </LovButton>
                         ))
-                      ) : null}
-                      {!addressLookupLoading && !visibleAddressSuggestions.length ? (
-                        <LovEmpty
-                          text={
-                            mapboxAccessToken
-                              ? "No address suggestion matched yet. Keep typing to refine the address."
-                              : "Set VITE_MAPBOX_ACCESS_TOKEN to use live address suggestions."
-                          }
-                        />
                       ) : null}
                     </LovPanel>
                   ) : null}
@@ -697,7 +754,7 @@ export default function PublicWorkspaceProperties() {
 
               <div className="space-y-3">
                 {draft.units.map((unit, index) => (
-                  <div key={`unit-${index}`} className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div key={`unit-${index}`} className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">
@@ -782,7 +839,7 @@ export default function PublicWorkspaceProperties() {
                       </div>
 
                       {unit.isOccupied ? (
-                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-3 md:p-4 sm:grid-cols-3">
                           <TextField
                             label="Current tenant name"
                             value={unit.currentTenantName}
@@ -832,11 +889,11 @@ export default function PublicWorkspaceProperties() {
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
-                onClick={() => void createProperty()}
+                onClick={() => void saveProperty()}
                 disabled={saving}
                 className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
               >
-                {saving ? "Saving..." : "Save property"}
+                {saving ? "Saving..." : editingPropertyId ? "Update property" : "Save property"}
               </Button>
               <Button variant="outline" onClick={resetForm} disabled={saving}>
                 Cancel
@@ -850,7 +907,7 @@ export default function PublicWorkspaceProperties() {
         <CardHeader>
           <CardTitle className="text-lg">Linked properties</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 md:space-y-4">
           {loading ? <p className="text-sm text-muted-foreground">Loading properties...</p> : null}
           {!loading && error ? <p className="text-sm text-rose-600">{error}</p> : null}
           {!loading && !items.length && !error ? (
@@ -858,7 +915,7 @@ export default function PublicWorkspaceProperties() {
           ) : null}
 
           {items.map((property) => (
-            <div key={property.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <div key={property.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)]">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -890,6 +947,14 @@ export default function PublicWorkspaceProperties() {
                 </div>
 
                 <div className="space-y-3">
+                  {isLandlord ? (
+                    <div className="flex justify-end">
+                      <Button variant="outline" onClick={() => startEditingProperty(property)}>
+                        Edit property
+                      </Button>
+                    </div>
+                  ) : null}
+
                   {property.isOccupied ? (
                     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
                       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current tenant</p>

@@ -165,20 +165,12 @@ export default function PublicWorkspaceQueue() {
 
   const propertyUnitOptions = useMemo(() => {
     if (!selectedProperty) return [];
-    const pendingUnitIds = new Set(
-      queue
-        .filter((item) => !item.decision)
-        .map((item) => item.propertyUnit?.id)
-        .filter(Boolean) as string[]
-    );
-
     return selectedProperty.units
-      .filter((unit) => !pendingUnitIds.has(unit.id) || unit.id === draft.propertyUnitId)
       .map((unit) => ({
         value: unit.id,
         label: `${unit.label} · ${unit.bedroomCount} bed · ${unit.bathroomCount} bath`
       }));
-  }, [draft.propertyUnitId, queue, selectedProperty]);
+  }, [selectedProperty]);
 
   function resetSearchFlow(nextPropertyId?: string) {
     const nextSelectedProperty = properties.find((property) => property.id === (nextPropertyId ?? draft.propertyId)) || null;
@@ -395,9 +387,6 @@ export default function PublicWorkspaceQueue() {
                   ))}
                 </SelectContent>
               </Select>
-              {selectedProperty && !propertyUnitOptions.length ? (
-                <p className="text-xs text-amber-700">All units in this property already have pending renters.</p>
-              ) : null}
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
               <p className="text-sm font-semibold text-slate-950">Search</p>
@@ -441,7 +430,7 @@ export default function PublicWorkspaceQueue() {
                       </div>
                       <div className="text-right">
                         <Badge variant="outline">{result.status}</Badge>
-                        {result.alreadyQueued ? <p className="mt-2 text-xs text-amber-700">Already in this property queue</p> : null}
+                        {result.alreadyQueued ? <p className="mt-2 text-xs text-amber-700">Already in this unit queue</p> : null}
                       </div>
                     </div>
                   </button>
