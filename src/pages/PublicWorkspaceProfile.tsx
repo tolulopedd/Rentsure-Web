@@ -185,6 +185,7 @@ export default function PublicWorkspaceProfile() {
     return <div className="text-sm text-destructive">We could not load this landlord / agent profile.</div>;
   }
   const phoneError = draft.phone.trim() && !isValidNigeriaPhone(draft.phone) ? nigeriaPhoneMessage() : "";
+  const linkedAccounts = data?.linkedAccounts || [];
 
   const roleOptions =
     profile.entityType === "COMPANY"
@@ -457,6 +458,38 @@ export default function PublicWorkspaceProfile() {
               <InfoTile label="Phone" value={profile.phone || "-"} icon={Phone} />
               <InfoTile label="Coverage" value="Nigeria RentSure Operations" icon={MapPin} />
               {profile.organizationName ? <InfoTile label="Entity" value={profile.organizationName} icon={Building2} /> : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {profile.accountType === "LANDLORD" ? "Linked agents" : "Linked landlords"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {linkedAccounts.length ? (
+                linkedAccounts.map((item) => (
+                  <div key={item.accountId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-slate-950">{item.name}</p>
+                      <Badge variant="outline">{item.accountType.toLowerCase()}</Badge>
+                    </div>
+                    <p className="mt-2">{item.email}</p>
+                    <p>{item.phone}</p>
+                    <p className="mt-2">
+                      <span className="font-semibold text-slate-950">Properties together:</span> {item.propertyCount}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold text-slate-950">Linked on:</span> {item.properties.join(", ")}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  {profile.accountType === "LANDLORD" ? "No agents are linked to you yet." : "No landlords are linked to you yet."}
+                </div>
+              )}
             </CardContent>
           </Card>
 

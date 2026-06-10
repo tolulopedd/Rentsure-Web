@@ -180,7 +180,7 @@ export default function VerifyEmail() {
                     Verified email
                   </div>
                   <div className="mt-4 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                    {result.accountType === "RENTER" ? "Renter" : "Landlord / Agent"} ·{" "}
+                    {result.accountType === "RENTER" ? "Renter" : result.accountType === "LANDLORD" ? "Landlord" : "Agent"} ·{" "}
                     {result.entityType === "COMPANY" ? "Company" : "Individual"}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-600">
