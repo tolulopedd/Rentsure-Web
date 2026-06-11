@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
+import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   createWorkspaceProposedRenter,
   getWorkspaceQueueItem,
@@ -501,11 +502,11 @@ export default function PublicWorkspaceQueue() {
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                      <p className="truncate font-semibold text-slate-950">{item.property.summaryLabel}</p>
+                      <p className="truncate font-semibold text-slate-950">{propertyDisplayName(item.property)}</p>
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                      <p className="truncate font-medium text-slate-700">{item.propertyUnit?.summaryLabel || item.propertyUnit?.label || "-"}</p>
+                      <p className="truncate font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
@@ -573,11 +574,11 @@ export default function PublicWorkspaceQueue() {
                       ) : null}
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                        <p className="text-sm text-slate-600">{detail.property.summaryLabel}</p>
+                        <p className="text-sm text-slate-600">{propertyDisplayName(detail.property)}</p>
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                        <p className="text-sm text-slate-600">{detail.propertyUnit?.summaryLabel || detail.propertyUnit?.label || "-"}</p>
+                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(detail.propertyUnit)}</p>
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property address</p>

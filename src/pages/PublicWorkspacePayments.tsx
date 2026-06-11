@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
+import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   confirmWorkspacePaymentSchedule,
   createWorkspacePaymentSchedule,
@@ -219,7 +220,8 @@ export default function PublicWorkspacePayments() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{renterName(item)}</p>
-                    <p className="text-sm text-slate-600">{item.property.summaryLabel}</p>
+                    <p className="text-sm text-slate-600">{propertyDisplayName(item.property)}</p>
+                    <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
                     <p className="text-xs text-muted-foreground">{item.property.address}</p>
                   </div>
                   <div className="text-right">
@@ -250,13 +252,15 @@ export default function PublicWorkspacePayments() {
                         </Badge>
                       </div>
                       <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
-                      <p className="text-sm text-slate-600">{detail.property.summaryLabel}</p>
+                      <p className="text-sm text-slate-600">{propertyDisplayName(detail.property)}</p>
+                      <p className="text-sm text-slate-600">{propertyUnitDisplayName(detail.propertyUnit)}</p>
                       <p className="text-xs text-muted-foreground">{detail.property.address}</p>
                     </div>
                     <div className="space-y-2 text-sm text-slate-600">
                       <SummaryRow label="Decision" value={detail.decision?.decision || "APPROVED"} />
                       <SummaryRow label="Schedules" value={`${detail.paymentSchedules.length}`} />
-                      <SummaryRow label="Property" value={detail.property.summaryLabel} />
+                      <SummaryRow label="Property" value={propertyDisplayName(detail.property)} />
+                      <SummaryRow label="Unit" value={propertyUnitDisplayName(detail.propertyUnit)} />
                     </div>
                   </div>
                 </div>

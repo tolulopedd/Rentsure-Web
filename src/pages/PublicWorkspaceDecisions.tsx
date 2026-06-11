@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
+import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   decideWorkspaceProposedRenter,
   forwardWorkspaceScoreRequest,
@@ -215,7 +216,8 @@ export default function PublicWorkspaceDecisions() {
           <div class="hero">
             <h1>RentSure Rent Score Report</h1>
             <p><strong>Proposed renter:</strong> ${escapeHtml(renter)}</p>
-            <p><strong>Property:</strong> ${escapeHtml(detail.property.summaryLabel)}</p>
+            <p><strong>Property:</strong> ${escapeHtml(propertyDisplayName(detail.property))}</p>
+            <p><strong>Unit:</strong> ${escapeHtml(propertyUnitDisplayName(detail.propertyUnit))}</p>
             <p><strong>Property address:</strong> ${escapeHtml(detail.property.address)}, ${escapeHtml(detail.property.city)}, ${escapeHtml(detail.property.state)}</p>
             <p><strong>Landlord decision:</strong> ${escapeHtml(currentDecisionLabel)}</p>
           </div>
@@ -324,11 +326,11 @@ export default function PublicWorkspaceDecisions() {
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                        <p className="font-semibold text-slate-950">{item.property.summaryLabel}</p>
+                        <p className="font-semibold text-slate-950">{propertyDisplayName(item.property)}</p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                        <p className="font-medium text-slate-700">{item.propertyUnit?.summaryLabel || item.propertyUnit?.label || "-"}</p>
+                        <p className="font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
@@ -374,8 +376,8 @@ export default function PublicWorkspaceDecisions() {
                         <div className="space-y-2 text-sm text-slate-600">
                           <SummaryRow label="Email" value={detail.email} />
                           <SummaryRow label="Phone" value={detail.phone} />
-                          <SummaryRow label="Property" value={detail.property.summaryLabel} />
-                          <SummaryRow label="Unit" value={detail.propertyUnit?.summaryLabel || detail.propertyUnit?.label || "-"} />
+                          <SummaryRow label="Property" value={propertyDisplayName(detail.property)} />
+                          <SummaryRow label="Unit" value={propertyUnitDisplayName(detail.propertyUnit)} />
                           <SummaryRow label="Address" value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`} />
                           {!isAgent ? (
                             <SummaryRow
