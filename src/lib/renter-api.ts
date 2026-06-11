@@ -121,11 +121,35 @@ export type RenterDashboardResponse = {
       city: string;
       state: string;
     };
+    propertyUnit: {
+      id: string;
+      label: string;
+      summaryLabel?: string | null;
+      address: string;
+      city: string;
+      state: string;
+      bedroomCount: number;
+      bathroomCount: number;
+      isOccupied: boolean;
+      currentTenantName?: string | null;
+      currentTenantEmail?: string | null;
+      currentTenantPhone?: string | null;
+    } | null;
     scoreRequests: Array<{
       id: string;
       status: string;
+      acceptedAt?: string | null;
       requestedBy: string;
+      requestedByEmail: string;
+      requestedByType: "LANDLORD" | "AGENT" | "RENTER";
       forwardedTo?: string | null;
+      forwardedToEmail?: string | null;
+      forwardedToType?: "LANDLORD" | "AGENT" | "RENTER" | null;
+      shareTarget: {
+        name: string;
+        email: string;
+        type: "LANDLORD" | "AGENT";
+      };
       createdAt: string;
     }>;
     paymentSchedules: Array<{

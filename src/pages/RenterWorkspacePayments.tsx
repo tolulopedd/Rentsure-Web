@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/errors";
+import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { preparePassportPhotoUpload, uploadPublicAccountDocument } from "@/lib/upload";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
@@ -24,7 +25,7 @@ type EvidencePayload = {
 };
 
 export default function RenterWorkspacePayments() {
-  const { data, pendingSchedules, initiateDirectPayment, initiateSchedulePaymentConfirmation } = useRenterWorkspace();
+  const { data, initiateDirectPayment, initiateSchedulePaymentConfirmation } = useRenterWorkspace();
   const [showDirectPaymentForm, setShowDirectPaymentForm] = useState(false);
   const [directPayment, setDirectPayment] = useState<{
     linkedCaseId: string;
@@ -50,25 +51,43 @@ export default function RenterWorkspacePayments() {
   const [uploadingDirectEvidence, setUploadingDirectEvidence] = useState(false);
   const [submittingDirectPayment, setSubmittingDirectPayment] = useState(false);
 
-  const eligibleLinkedCases = useMemo(
-    () => data?.linkedCases.filter((item) => item.decision !== "DECLINED") || [],
+  const approvedLinkedCases = useMemo(
+    () => data?.linkedCases.filter((item) => item.decision === "APPROVED" && item.propertyUnit) || [],
     [data]
+  );
+
+  const pendingApprovedSchedules = useMemo(
+    () =>
+      approvedLinkedCases.flatMap((item) =>
+        item.paymentSchedules
+          .filter((schedule) => schedule.status !== "PAID")
+          .map((schedule) => ({
+            ...schedule,
+            linkedCaseId: item.id,
+            propertyName: item.property.name,
+            propertyUnit: item.propertyUnit
+          }))
+      ),
+    [approvedLinkedCases]
   );
 
   const paidSchedules = useMemo(
     () =>
-      data?.linkedCases
+      approvedLinkedCases
         .flatMap((item) =>
           item.paymentSchedules
             .filter((schedule) => schedule.status === "PAID")
             .map((schedule) => ({
               ...schedule,
-              propertyName: item.property.name
+              propertyName: item.property.name,
+              propertyUnit: item.propertyUnit
             }))
         )
-        .sort((a, b) => new Date(b.confirmedByRenterAt || b.dueDate).getTime() - new Date(a.confirmedByRenterAt || a.dueDate).getTime()) || [],
-    [data]
+        .sort((a, b) => new Date(b.confirmedByRenterAt || b.dueDate).getTime() - new Date(a.confirmedByRenterAt || a.dueDate).getTime()),
+    [approvedLinkedCases]
   );
+
+  const canInitiatePayment = approvedLinkedCases.length > 0;
 
   if (!data) return null;
 
@@ -175,49 +194,67 @@ export default function RenterWorkspacePayments() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.14),_transparent_32%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
+    <div className="space-y-4 md:space-y-6">
+      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.14),_transparent_32%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Payments</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Payments and proof</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+            <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Payments and proof</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 md:mt-3">
               Send your own payment proof to the landlord, or respond to landlord payment requests already linked to you.
             </p>
           </div>
-          <Button type="button" onClick={() => setShowDirectPaymentForm((current) => !current)} disabled={!eligibleLinkedCases.length}>
-            {showDirectPaymentForm ? "Cancel" : "Initiate payment"}
-          </Button>
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <Button type="button" onClick={() => setShowDirectPaymentForm((current) => !current)} disabled={!canInitiatePayment}>
+              {showDirectPaymentForm ? "Cancel" : canInitiatePayment ? "Initiate payment" : "Awaiting property link"}
+            </Button>
+            {!canInitiatePayment ? (
+              <p className="max-w-xs text-xs leading-5 text-slate-500">
+                You can only make payments or upload proof for a property unit that has been linked and approved for you.
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Pending payment schedules" value={String(pendingSchedules.length)} icon={CreditCard} />
+      <div className="grid gap-3 md:grid-cols-3">
+        <MetricCard label="Pending payment schedules" value={String(pendingApprovedSchedules.length)} icon={CreditCard} />
         <MetricCard label="Paid schedules" value={String(paidSchedules.length)} icon={ReceiptText} />
-        <MetricCard label="Linked rental properties" value={String(data.summary.activeLinkedCases)} icon={CreditCard} />
+        <MetricCard label="Approved linked units" value={String(approvedLinkedCases.length)} icon={CreditCard} />
       </div>
+
+      {!canInitiatePayment ? (
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="space-y-2 p-4 md:p-5">
+            <p className="text-sm font-semibold text-slate-950">Proof of payment is still available</p>
+            <p className="text-sm leading-6 text-slate-600">
+              Once a landlord approves a linked property unit for you, you will be able to initiate a payment, upload your receipt or screenshot, and send it for review here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {showDirectPaymentForm ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Initiate payment</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {!eligibleLinkedCases.length ? (
+          <CardContent className="space-y-3 md:space-y-4">
+            {!canInitiatePayment ? (
               <p className="text-sm text-muted-foreground">A landlord or agent needs to link a property to you before you can initiate a payment here.</p>
             ) : (
               <>
                 <div className="grid gap-3 md:grid-cols-2">
                   <SelectField
                     id="linked-case"
-                    label="Linked property"
+                    label="Approved linked unit"
                     value={directPayment.linkedCaseId}
                     onChange={(value) => setDirectPayment((current) => ({ ...current, linkedCaseId: value }))}
                     options={[
-                      { value: "", label: "Select linked property" },
-                      ...eligibleLinkedCases.map((item) => ({
+                      { value: "", label: "Select approved property unit" },
+                      ...approvedLinkedCases.map((item) => ({
                         value: item.id,
-                        label: item.property.name
+                        label: `${item.property.name} - ${propertyUnitDisplayName(item.propertyUnit)}`
                       }))
                     ]}
                   />
@@ -292,20 +329,29 @@ export default function RenterWorkspacePayments() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Payment requests</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {!pendingSchedules.length ? (
+          <CardContent className="space-y-3 md:space-y-4">
+            {!pendingApprovedSchedules.length ? (
               <p className="text-sm text-muted-foreground">No landlord payment requests are waiting right now.</p>
             ) : null}
-            {pendingSchedules.map((schedule) => (
-              <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+            {pendingApprovedSchedules.map((schedule) => (
+              <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{paymentTypeLabel(schedule.paymentType)}</p>
+                    <p className="mt-1 text-sm font-medium text-slate-700">{schedule.propertyName}</p>
+                    {schedule.propertyUnit ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(schedule.propertyUnit)}</p>
+                        <Badge className={occupancyBadgeClass(schedule.propertyUnit.isOccupied)} variant="outline">
+                          {occupancyLabel(schedule.propertyUnit.isOccupied)}
+                        </Badge>
+                      </div>
+                    ) : null}
                     <p className="text-sm text-slate-600">
                       {formatNgn(schedule.amountNgn)} · due {formatDate(schedule.dueDate)}
                     </p>
@@ -316,7 +362,7 @@ export default function RenterWorkspacePayments() {
                     {schedule.status}
                   </Badge>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <FormField
                     label="Receipt reference"
                     value={receiptById[schedule.id] || ""}
@@ -351,7 +397,7 @@ export default function RenterWorkspacePayments() {
                     <p className="text-xs text-amber-700">Proof sent on {formatDate(schedule.confirmationInitiatedAt)}. Awaiting landlord confirmation.</p>
                   ) : null}
                 </div>
-                <div className="mt-4 flex flex-wrap gap-3">
+                <div className="mt-3 flex flex-wrap gap-3">
                   <Button variant="outline" onClick={() => void initiateConfirmation(schedule.id)} disabled={initiatingId === schedule.id}>
                     {initiatingId === schedule.id ? "Sending..." : schedule.confirmationInitiatedAt ? "Update proof of payment" : "Send proof to landlord"}
                   </Button>
@@ -368,11 +414,19 @@ export default function RenterWorkspacePayments() {
           <CardContent className="space-y-3">
             {!paidSchedules.length ? <p className="text-sm text-muted-foreground">No payment confirmation has been recorded yet.</p> : null}
             {paidSchedules.slice(0, 8).map((schedule) => (
-              <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-950">{paymentTypeLabel(schedule.paymentType)}</p>
                     <p className="text-sm text-slate-600">{schedule.propertyName}</p>
+                    {schedule.propertyUnit ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(schedule.propertyUnit)}</p>
+                        <Badge className={occupancyBadgeClass(schedule.propertyUnit.isOccupied)} variant="outline">
+                          {occupancyLabel(schedule.propertyUnit.isOccupied)}
+                        </Badge>
+                      </div>
+                    ) : null}
                     <p className="text-xs text-muted-foreground">Confirmed {formatDate(schedule.confirmedByRenterAt || schedule.dueDate)}</p>
                   </div>
                   <div className="text-right">
@@ -405,11 +459,11 @@ function MetricCard({
   icon: typeof CreditCard;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-950 md:mt-2 md:text-2xl">{value}</p>
         </div>
         <Icon className="h-5 w-5 text-[var(--rentsure-blue)]" />
       </div>
