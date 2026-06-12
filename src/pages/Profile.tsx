@@ -23,20 +23,16 @@ function formatDate(value?: string | null) {
 
 function passwordChecks(value: string) {
   return [
-    { label: "10+ chars", met: value.length >= 10 },
+    { label: "6+ characters", met: value.length >= 6 },
     { label: "Uppercase", met: /[A-Z]/.test(value) },
-    { label: "Lowercase", met: /[a-z]/.test(value) },
-    { label: "Number", met: /\d/.test(value) },
-    { label: "Special", met: /[^A-Za-z0-9]/.test(value) }
+    { label: "Lowercase", met: /[a-z]/.test(value) }
   ];
 }
 
 function strongPasswordError(value: string) {
-  if (value.length < 8) return "New password must be at least 8 characters.";
+  if (value.length < 6) return "New password must be at least 6 characters.";
   if (!/[A-Z]/.test(value)) return "New password must include at least one uppercase letter.";
   if (!/[a-z]/.test(value)) return "New password must include at least one lowercase letter.";
-  if (!/\d/.test(value)) return "New password must include at least one number.";
-  if (!/[^A-Za-z0-9]/.test(value)) return "New password must include at least one special character.";
   return null;
 }
 

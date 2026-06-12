@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatNigeriaFallbackAddress, NIGERIA_ADDRESS_PLACEHOLDER } from "@/lib/nigeria-address";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 
 type NigeriaAddressFieldsProps = {
@@ -167,13 +168,16 @@ export function NigeriaAddressFields({
               setShowAddressLov(true);
             }}
             onFocus={() => setShowAddressLov(true)}
-            placeholder={cityValue ? `Start typing an address in ${cityValue}` : "Select a city before entering address"}
+            placeholder={NIGERIA_ADDRESS_PLACEHOLDER}
           />
           {showAddressLov && filteredAddresses.length ? (
             <LovPanel>
               {filteredAddresses.map((suggestion) => (
-                <LovButton key={suggestion.value} onClick={() => selectAddress(suggestion.value)}>
-                  <span>{suggestion.value}</span>
+                <LovButton
+                  key={suggestion.value}
+                  onClick={() => selectAddress(formatNigeriaFallbackAddress(suggestion.value, suggestion.city, suggestion.state))}
+                >
+                  <span>{formatNigeriaFallbackAddress(suggestion.value, suggestion.city, suggestion.state)}</span>
                   <span className="text-xs uppercase tracking-[0.12em] text-slate-400">
                     {suggestion.city}, {suggestion.state}
                   </span>

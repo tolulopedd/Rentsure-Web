@@ -28,30 +28,31 @@ export function PublicWorkspaceLayout() {
 
         <div className="flex flex-1 flex-col">
           <PublicWorkspaceTopbar />
-          <div className="border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex gap-2 overflow-x-auto">
+          <div className="border-b border-slate-200 bg-white px-2.5 py-2.5 md:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: "Dashboard", to: "/account/dashboard" },
-                { label: "Properties", to: "/account/properties" },
-                { label: "Link Tenant", to: "/account/queue" },
-                { label: "Landlord Decision", to: "/account/decisions" },
-                { label: "Payments", to: "/account/payments" },
-                { label: "Profile", to: "/account/profile" }
+                { label: "Dashboard", mobileLabel: "Dashboard", to: "/account/dashboard" },
+                { label: "Properties", mobileLabel: "Properties", to: "/account/properties" },
+                { label: "Link Tenant", mobileLabel: "Link", to: "/account/queue" },
+                { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/decisions" },
+                { label: "Payments", mobileLabel: "Payments", to: "/account/payments" },
+                { label: "Profile", mobileLabel: "Profile", to: "/account/profile" }
               ].map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   className={({ isActive }) =>
                     cx(
-                      "whitespace-nowrap rounded-full px-3 py-2 text-sm transition",
+                      "whitespace-nowrap rounded-full px-2.5 py-1.5 text-xs font-medium transition",
                       isActive
                         ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]"
                         : "bg-slate-100 text-slate-600"
                     )
                   }
                 >
-                  {item.label}
+                  <span className="sm:hidden">{item.mobileLabel}</span>
+                  <span className="hidden sm:inline">{item.label}</span>
                 </NavLink>
               ))}
               </div>
@@ -59,17 +60,17 @@ export function PublicWorkspaceLayout() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="shrink-0 rounded-full px-3 text-[var(--rentsure-blue)] hover:bg-slate-100"
+                className="shrink-0 rounded-full px-2.5 text-xs text-[var(--rentsure-blue)] hover:bg-slate-100"
                 onClick={logout}
               >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
-          <main className="relative flex-1 overflow-y-auto p-4 md:p-6">
+          <main className="relative flex-1 overflow-y-auto p-3 md:p-6">
             <div className="mx-auto max-w-7xl">
-              <div className="rounded-xl bg-background p-4 shadow-sm md:p-6">
+              <div className="rounded-xl bg-background p-3 shadow-sm md:p-6">
                 <Outlet />
               </div>
             </div>

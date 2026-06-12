@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Building2, UserCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -8,25 +9,40 @@ export function PublicWorkspaceTopbar() {
   const userName = localStorage.getItem("userName") || "RentSure user";
   const userRole = (localStorage.getItem("userRole") || "LANDLORD").toLowerCase();
   const userPhotoUrl = localStorage.getItem("userPhotoUrl") || "";
+  const [photoFailed, setPhotoFailed] = useState(false);
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [userPhotoUrl]);
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 backdrop-blur">
-      <div className="flex h-14 items-center justify-between px-4 md:px-6">
-        <div>
-          <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)]">RentSure property workspace</div>
-          <div className="text-[11px] text-muted-foreground">
+      <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 md:px-6">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)] md:text-base">Property workspace</div>
+          <div className="hidden text-[11px] text-muted-foreground sm:block">
             Shared queue for landlords and agents managing proposed renters and payment schedules
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 md:flex">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 lg:flex">
             <Building2 className="h-4 w-4 text-[var(--rentsure-blue)]" />
             <span className="text-sm text-slate-600">Nigeria RentSure Operations</span>
           </div>
-          <Button variant="ghost" className="rounded-lg" onClick={() => nav("/account/profile")} title="My profile">
-            <Avatar className="h-8 w-8 rounded-lg">
-              {userPhotoUrl ? <AvatarImage src={userPhotoUrl} alt={userName} className="object-cover" /> : null}
+          <Button variant="ghost" className="rounded-lg px-2" onClick={() => nav("/account/profile")} title="My profile">
+            <Avatar className="h-8 w-8 rounded-lg md:h-9 md:w-9">
+              {userPhotoUrl && !photoFailed ? (
+                <AvatarImage
+                  src={userPhotoUrl}
+                  alt={userName}
+                  className="object-cover"
+                  onError={() => {
+                    setPhotoFailed(true);
+                    localStorage.removeItem("userPhotoUrl");
+                  }}
+                />
+              ) : null}
               <AvatarFallback className="rounded-lg bg-gradient-to-br from-[var(--rentsure-blue)] to-[var(--rentsure-blue-deep)] text-sm font-medium text-white">
                 {userName.charAt(0).toUpperCase()}
               </AvatarFallback>

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
-import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   createWorkspaceProposedRenter,
   getWorkspaceQueueItem,
@@ -169,7 +169,7 @@ export default function PublicWorkspaceQueue() {
     return selectedProperty.units
       .map((unit) => ({
         value: unit.id,
-        label: `${unit.label} · ${unit.bedroomCount} bed · ${unit.bathroomCount} bath`
+        label: `${unit.label} · ${unit.bedroomCount} bed · ${unit.bathroomCount} bath · ${occupancyLabel(unit.isOccupied)}`
       }));
   }, [selectedProperty]);
 
@@ -506,7 +506,14 @@ export default function PublicWorkspaceQueue() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                      <p className="truncate font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                        {item.propertyUnit ? (
+                          <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
+                            {occupancyLabel(item.propertyUnit.isOccupied)}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
@@ -578,7 +585,14 @@ export default function PublicWorkspaceQueue() {
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(detail.propertyUnit)}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                          <span>{propertyUnitDisplayName(detail.propertyUnit)}</span>
+                          {detail.propertyUnit ? (
+                            <Badge className={occupancyBadgeClass(detail.propertyUnit.isOccupied)} variant="outline">
+                              {occupancyLabel(detail.propertyUnit.isOccupied)}
+                            </Badge>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property address</p>

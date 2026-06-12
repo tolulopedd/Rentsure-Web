@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  acceptRenterScoreRequest,
   createSelfInitiatedRenterPayment,
   confirmRenterPayment,
   getRenterDashboard,
@@ -66,6 +67,7 @@ type RenterWorkspaceContextValue = {
     paymentEvidenceFileSize: number;
   }) => Promise<boolean>;
   shareScoreReport: (input: {
+    linkedCaseId?: string;
     recipientEmail: string;
     recipientType: "LANDLORD" | "AGENT";
     recipientFirstName?: string;
@@ -73,6 +75,7 @@ type RenterWorkspaceContextValue = {
     recipientPhone?: string;
     note?: string;
   }) => Promise<{ success: boolean; previewUrl?: string | null }>;
+  acceptScoreRequest: (linkedCaseId: string) => Promise<boolean>;
   savePassportPhoto: (input: {
     objectKey: string;
     fileName: string;
@@ -251,6 +254,7 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
   }
 
   async function shareScoreReport(input: {
+    linkedCaseId?: string;
     recipientEmail: string;
     recipientType: "LANDLORD" | "AGENT";
     recipientFirstName?: string;
@@ -269,6 +273,18 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to share rent score report"));
       return { success: false };
+    }
+  }
+
+  async function acceptScoreRequest(linkedCaseId: string) {
+    try {
+      const response = await acceptRenterScoreRequest(linkedCaseId);
+      setData(response);
+      toast.success("Landlord request accepted");
+      return true;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to accept landlord request"));
+      return false;
     }
   }
 
@@ -305,6 +321,7 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
         initiateSchedulePaymentConfirmation,
         initiateDirectPayment,
         shareScoreReport,
+        acceptScoreRequest,
         savePassportPhoto
       }}
     >

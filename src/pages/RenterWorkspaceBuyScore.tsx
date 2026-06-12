@@ -28,6 +28,12 @@ function paymentStatusBadgeClass(status: string) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function paymentProviderLabel(provider: "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER") {
+  if (provider === "PAYSTACK") return "Paystack";
+  if (provider === "FLUTTERWAVE") return "Flutterwave";
+  return "Cash / transfer";
+}
+
 export default function RenterWorkspaceBuyScore() {
   const { data, refresh } = useRenterWorkspace();
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
@@ -189,17 +195,17 @@ export default function RenterWorkspaceBuyScore() {
             {showPaymentOptions && !purchaseInProgress ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-sm font-semibold text-slate-950">Choose payment method</p>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={() => void startPurchase("PAYSTACK")} disabled={Boolean(submittingProvider)}>
-                    {submittingProvider === "PAYSTACK" ? "Opening..." : "Paystack"}
-                  </Button>
-                  <Button variant="outline" onClick={() => void startPurchase("FLUTTERWAVE")} disabled={Boolean(submittingProvider)}>
-                    {submittingProvider === "FLUTTERWAVE" ? "Opening..." : "Flutterwave"}
-                  </Button>
-                  <Button variant="outline" onClick={() => void startPurchase("MANUAL_TRANSFER")} disabled={Boolean(submittingProvider)}>
-                    {submittingProvider === "MANUAL_TRANSFER" ? "Creating..." : "Cash / transfer"}
-                  </Button>
-                </div>
+                {!data.availableRentScorePaymentProviders.length ? (
+                  <p className="mt-4 text-sm text-amber-700">No payment method is configured right now. Please contact RentSure support.</p>
+                ) : (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {data.availableRentScorePaymentProviders.map((provider) => (
+                      <Button key={provider} variant="outline" onClick={() => void startPurchase(provider)} disabled={Boolean(submittingProvider)}>
+                        {submittingProvider === provider ? (provider === "MANUAL_TRANSFER" ? "Creating..." : "Opening...") : paymentProviderLabel(provider)}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
           </CardContent>

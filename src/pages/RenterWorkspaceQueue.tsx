@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
-import { ClipboardList, Clock3, ScrollText } from "lucide-react";
+import { ArrowRight, ClipboardList, Clock3, ScrollText } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
   decisionBadgeClass,
@@ -12,7 +15,7 @@ import {
 } from "@/lib/renter-workspace-presenters";
 
 export default function RenterWorkspaceQueue() {
-  const { data } = useRenterWorkspace();
+  const { data, acceptScoreRequest } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
   const [selectedId, setSelectedId] = useState(linkedCases[0]?.id || "");
 
@@ -20,20 +23,31 @@ export default function RenterWorkspaceQueue() {
     () => linkedCases.find((item) => item.id === selectedId) || linkedCases[0] || null,
     [linkedCases, selectedId]
   );
+  const latestScoreRequest = selectedItem?.scoreRequests[0] || null;
+  const canAcceptLatestRequest = Boolean(latestScoreRequest && !latestScoreRequest.acceptedAt);
+  const requestAlreadyShared = Boolean(
+    latestScoreRequest?.acceptedAt &&
+      selectedItem &&
+      (selectedItem.status === "SCORE_SHARED" ||
+        selectedItem.status === "UNDER_REVIEW" ||
+        selectedItem.status === "DECISION_READY" ||
+        selectedItem.decision)
+  );
+  const canShareLatestRequest = Boolean(latestScoreRequest?.acceptedAt) && !requestAlreadyShared;
 
   if (!data) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
+    <div className="space-y-4 md:space-y-6">
+      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Landlord Decision</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Track landlord decision flow for linked properties</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Follow rent score requests, landlord or agent decisions, payment schedules, and activity history tied to your profile.
+        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Track landlord decision flow for linked properties</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 md:mt-3">
+          Follow rent score requests, accept landlord requests, share your rent score, and review the latest property decision updates.
         </p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.94fr_1.36fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.94fr_1.36fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">My landlord decisions</CardTitle>
@@ -45,7 +59,7 @@ export default function RenterWorkspaceQueue() {
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
+                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
                   selectedItem?.id === item.id
                     ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
                     : "border-slate-200 bg-white hover:bg-slate-50"
@@ -54,6 +68,14 @@ export default function RenterWorkspaceQueue() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-950">{item.property.name}</p>
+                    {item.propertyUnit ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
+                          {occupancyLabel(item.propertyUnit.isOccupied)}
+                        </Badge>
+                      </div>
+                    ) : null}
                     <p className="text-sm text-slate-600">{item.property.address}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.property.city}, {item.property.state}
@@ -78,11 +100,11 @@ export default function RenterWorkspaceQueue() {
           <CardHeader>
             <CardTitle className="text-lg">Decision detail</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4 md:space-y-5">
             {!selectedItem ? <p className="text-sm text-muted-foreground">Select a linked property from your queue to continue.</p> : null}
             {selectedItem ? (
               <>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
@@ -90,6 +112,14 @@ export default function RenterWorkspaceQueue() {
                         Queue status
                       </div>
                       <p className="mt-3 text-lg font-semibold text-slate-950">{selectedItem.property.name}</p>
+                      {selectedItem.propertyUnit ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <p className="text-sm text-slate-600">{propertyUnitDisplayName(selectedItem.propertyUnit)}</p>
+                          <Badge className={occupancyBadgeClass(selectedItem.propertyUnit.isOccupied)} variant="outline">
+                            {occupancyLabel(selectedItem.propertyUnit.isOccupied)}
+                          </Badge>
+                        </div>
+                      ) : null}
                       <p className="text-sm text-slate-600">{selectedItem.property.address}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedItem.property.city}, {selectedItem.property.state}
@@ -104,7 +134,7 @@ export default function RenterWorkspaceQueue() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-3">
                   <MiniCard label="Score requests" value={String(selectedItem.scoreRequests.length)} />
                   <MiniCard label="Payment schedules" value={String(selectedItem.paymentSchedules.length)} />
                   <MiniCard label="Timeline events" value={String(selectedItem.activities.length)} />
@@ -119,12 +149,13 @@ export default function RenterWorkspaceQueue() {
                       <p className="text-sm text-muted-foreground">No rent score request has been logged for this property yet.</p>
                     ) : null}
                     {selectedItem.scoreRequests.map((request) => (
-                      <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="font-semibold text-slate-950">{request.status.replaceAll("_", " ")}</p>
                             <p className="text-sm text-slate-600">Requested by {request.requestedBy}</p>
                             {request.forwardedTo ? <p className="text-sm text-slate-600">Forwarded to {request.forwardedTo}</p> : null}
+                            {request.acceptedAt ? <p className="text-sm text-emerald-700">Accepted on {formatDate(request.acceptedAt)}</p> : null}
                           </div>
                           <p className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</p>
                         </div>
@@ -142,7 +173,7 @@ export default function RenterWorkspaceQueue() {
                       <p className="text-sm text-muted-foreground">No payment schedule has been attached to this linked property yet.</p>
                     ) : null}
                     {selectedItem.paymentSchedules.map((schedule) => (
-                      <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="font-semibold text-slate-950">{paymentTypeLabel(schedule.paymentType)}</p>
@@ -174,7 +205,7 @@ export default function RenterWorkspaceQueue() {
                       <p className="text-sm text-muted-foreground">No queue activity has been recorded for this linked property yet.</p>
                     ) : null}
                     {selectedItem.activities.map((activity) => (
-                      <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="font-semibold text-slate-950">{activity.message}</p>
@@ -189,6 +220,46 @@ export default function RenterWorkspaceQueue() {
                     ))}
                   </CardContent>
                 </Card>
+
+                <div className="flex flex-wrap gap-3">
+                  {canAcceptLatestRequest ? (
+                    <Button
+                      className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                      onClick={() => void acceptScoreRequest(selectedItem.id)}
+                    >
+                      Accept landlord request
+                    </Button>
+                  ) : null}
+                  {canShareLatestRequest ? (
+                    <Button asChild className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
+                      <Link to={`/account/renter/share-score?linkedCaseId=${encodeURIComponent(selectedItem.id)}`}>
+                        Share rent score
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  ) : requestAlreadyShared ? (
+                    <Button disabled className="bg-slate-300 text-slate-700 hover:bg-slate-300">
+                      Rent score shared
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : !canAcceptLatestRequest ? (
+                    <Button disabled className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
+                      Share rent score
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : null}
+                </div>
+                {!selectedItem.scoreRequests.length ? (
+                  <p className="text-sm text-slate-500">
+                    Share rent score becomes available here after a landlord or agent requests it from you.
+                  </p>
+                ) : canAcceptLatestRequest ? (
+                  <p className="text-sm text-slate-500">Accept the landlord request first, then share your rent score from here.</p>
+                ) : canShareLatestRequest ? (
+                  <p className="text-sm text-slate-500">Your request has been accepted. Share your rent score so the landlord can review it.</p>
+                ) : requestAlreadyShared ? (
+                  <p className="text-sm text-slate-500">You have already shared your rent score for this request. A new landlord request is required before you can share again.</p>
+                ) : null}
               </>
             ) : null}
           </CardContent>
@@ -200,11 +271,11 @@ export default function RenterWorkspaceQueue() {
 
 function MiniCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-950 md:mt-2 md:text-2xl">{value}</p>
         </div>
         <Clock3 className="h-5 w-5 text-[var(--rentsure-blue)]" />
       </div>

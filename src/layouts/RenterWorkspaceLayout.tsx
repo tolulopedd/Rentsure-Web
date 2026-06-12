@@ -77,8 +77,7 @@ function RenterWorkspaceShell() {
                 { label: "Linked Properties", mobileLabel: "My Links", to: "/account/renter/cases" },
                 { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/renter/queue" },
                 { label: "Payments", mobileLabel: "Payments", to: "/account/renter/payments" },
-                { label: "Profile", mobileLabel: "Profile", to: "/account/renter/profile" },
-                { label: "Share score", mobileLabel: "Share", to: "/account/renter/share-score" }
+                { label: "Profile", mobileLabel: "Profile", to: "/account/renter/profile" }
               ].map((item) => (
                 <NavLink
                   key={item.to}

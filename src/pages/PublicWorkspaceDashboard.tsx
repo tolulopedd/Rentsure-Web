@@ -3,6 +3,7 @@ import { Building2, CalendarClock, ListChecks, Scale, Sparkles } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getErrorMessage } from "@/lib/errors";
+import { propertyUnitsStatusSummary } from "@/lib/property-display";
 import { getWorkspaceOverview, type WorkspaceOverview } from "@/lib/public-workspace-api";
 import { useAutoRefresh } from "@/lib/use-auto-refresh";
 
@@ -17,6 +18,7 @@ export default function PublicWorkspaceDashboard() {
   const [data, setData] = useState<WorkspaceOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isAgent = (localStorage.getItem("userRole") || "").toUpperCase() === "AGENT";
 
   const loadOverview = useCallback(async (input?: { silent?: boolean }) => {
     try {
@@ -57,20 +59,20 @@ export default function PublicWorkspaceDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
+    <div className="space-y-4 md:space-y-6">
+      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Dashboard</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Dashboard</h1>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Dashboard</h1>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-2 xl:grid-cols-4 xl:gap-4">
         <MetricCard label="Linked properties" value={String(data.summary.propertyCount)} icon={Building2} />
         <MetricCard label="Proposed renters" value={String(data.summary.proposedRenterCount)} icon={ListChecks} />
         <MetricCard label="Score requests" value={String(data.summary.scoreRequestCount)} icon={Scale} />
         <MetricCard label="Payment schedules" value={String(data.summary.pendingScheduleCount)} icon={CalendarClock} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Linked properties</CardTitle>
@@ -78,12 +80,13 @@ export default function PublicWorkspaceDashboard() {
           <CardContent className="space-y-3">
             {!data.properties.length ? <p className="text-sm text-muted-foreground">No properties linked yet.</p> : null}
             {data.properties.map((property) => (
-              <div key={property.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={property.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{property.summaryLabel}</p>
                     <p className="mt-1 text-sm text-slate-600">{property.address}</p>
                     <p className="text-xs text-muted-foreground">{property.city}, {property.state}</p>
+                    <p className="mt-1 text-xs text-slate-500">{propertyUnitsStatusSummary(property.units)}</p>
                   </div>
                   <Badge variant="outline">{property.membershipRole}</Badge>
                 </div>
@@ -102,7 +105,7 @@ export default function PublicWorkspaceDashboard() {
           <CardContent className="space-y-3">
             {!data.recentRenters.length ? <p className="text-sm text-muted-foreground">No proposed renters yet.</p> : null}
             {data.recentRenters.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-slate-950">{item.name}</p>
@@ -121,6 +124,7 @@ export default function PublicWorkspaceDashboard() {
                     ) : (
                       <p className="mt-1 text-xs text-slate-500">Rent score in progress</p>
                     )}
+                    {isAgent ? <p className="mt-1 text-xs text-slate-500">Rent score is only visible to linked landlords.</p> : null}
                   </div>
                 </div>
               </div>
@@ -134,11 +138,11 @@ export default function PublicWorkspaceDashboard() {
 
 function MetricCard({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Building2 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-slate-950 md:text-2xl">{value}</p>
         </div>
         <Icon className="h-5 w-5 text-[var(--rentsure-blue)]" />
       </div>

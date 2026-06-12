@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Building2, Clock3, ScrollText } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Building2, Clock3, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
   decisionBadgeClass,
@@ -26,13 +25,13 @@ export default function RenterWorkspaceCases() {
   if (!data) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.16),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
+    <div className="space-y-4 md:space-y-6">
+      <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.16),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">My Links</p>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">Track every properties linked to you</h1>
+        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-2xl">Track every properties linked to you</h1>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.92fr_1.38fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.38fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Linked properties</CardTitle>
@@ -44,7 +43,7 @@ export default function RenterWorkspaceCases() {
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
+                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
                   selectedCase?.id === item.id
                     ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
                     : "border-slate-200 bg-white hover:bg-slate-50"
@@ -53,6 +52,14 @@ export default function RenterWorkspaceCases() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-950">{item.property.name}</p>
+                    {item.propertyUnit ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
+                          {occupancyLabel(item.propertyUnit.isOccupied)}
+                        </Badge>
+                      </div>
+                    ) : null}
                     <p className="text-sm text-slate-600">{item.property.address}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.property.city}, {item.property.state}
@@ -74,11 +81,11 @@ export default function RenterWorkspaceCases() {
           <CardHeader>
             <CardTitle className="text-lg">Property detail</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4 md:space-y-5">
             {!selectedCase ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
             {selectedCase ? (
               <>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
@@ -86,6 +93,14 @@ export default function RenterWorkspaceCases() {
                         Linked property
                       </div>
                       <p className="mt-3 text-lg font-semibold text-slate-950">{selectedCase.property.name}</p>
+                      {selectedCase.propertyUnit ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <p className="text-sm text-slate-600">{propertyUnitDisplayName(selectedCase.propertyUnit)}</p>
+                          <Badge className={occupancyBadgeClass(selectedCase.propertyUnit.isOccupied)} variant="outline">
+                            {occupancyLabel(selectedCase.propertyUnit.isOccupied)}
+                          </Badge>
+                        </div>
+                      ) : null}
                       <p className="text-sm text-slate-600">{selectedCase.property.address}</p>
                       <p className="text-xs text-muted-foreground">
                         {selectedCase.property.city}, {selectedCase.property.state}
@@ -100,13 +115,13 @@ export default function RenterWorkspaceCases() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-3">
                   <MiniCard label="Score requests" value={String(selectedCase.scoreRequests.length)} />
                   <MiniCard label="Payment schedules" value={String(selectedCase.paymentSchedules.length)} />
                   <MiniCard label="Timeline events" value={String(selectedCase.activities.length)} />
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+                <div className="grid gap-4 xl:grid-cols-[1fr_1fr] xl:gap-6">
                   <Card className="border-slate-200 shadow-none">
                     <CardHeader className="px-0 pt-0">
                       <CardTitle className="text-base">Rent score request history</CardTitle>
@@ -116,7 +131,7 @@ export default function RenterWorkspaceCases() {
                         <p className="text-sm text-muted-foreground">No rent score request has been logged yet for this case.</p>
                       ) : null}
                       {selectedCase.scoreRequests.map((request) => (
-                        <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                               <p className="font-semibold text-slate-950">{request.status.replaceAll("_", " ")}</p>
@@ -139,7 +154,7 @@ export default function RenterWorkspaceCases() {
                         <p className="text-sm text-muted-foreground">No payment schedule has been attached to this case yet.</p>
                       ) : null}
                       {selectedCase.paymentSchedules.map((schedule) => (
-                        <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                               <p className="font-semibold text-slate-950">{paymentTypeLabel(schedule.paymentType)}</p>
@@ -171,7 +186,7 @@ export default function RenterWorkspaceCases() {
                       <p className="text-sm text-muted-foreground">No activity has been recorded for this case yet.</p>
                     ) : null}
                     {selectedCase.activities.map((activity) => (
-                      <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <p className="font-semibold text-slate-950">{activity.message}</p>
@@ -186,18 +201,6 @@ export default function RenterWorkspaceCases() {
                     ))}
                   </CardContent>
                 </Card>
-
-                <div className="flex flex-wrap gap-3">
-                  <Button asChild className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
-                    <Link to="/account/renter/payments">
-                      Confirm payments
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline">
-                    <Link to="/account/renter/share-score">Share rent score</Link>
-                  </Button>
-                </div>
               </>
             ) : null}
           </CardContent>
@@ -209,11 +212,11 @@ export default function RenterWorkspaceCases() {
 
 function MiniCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-slate-950 md:mt-2 md:text-2xl">{value}</p>
         </div>
         <Clock3 className="h-5 w-5 text-[var(--rentsure-blue)]" />
       </div>

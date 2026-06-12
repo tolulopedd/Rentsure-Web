@@ -67,6 +67,7 @@ export type RenterDashboardResponse = {
   reportAccess: {
     canShareOrDownload: boolean;
   };
+  availableRentScorePaymentProviders: Array<"PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER">;
   notifications: Array<{
     id: string;
     notificationType: "PROPERTY_LINKED";
@@ -275,6 +276,7 @@ export function createSelfInitiatedRenterPayment(input: {
 }
 
 export function shareRenterScoreReport(input: {
+  linkedCaseId?: string;
   recipientEmail: string;
   recipientType: "LANDLORD" | "AGENT";
   recipientFirstName?: string;
@@ -285,6 +287,12 @@ export function shareRenterScoreReport(input: {
   return apiFetch<{ dashboard: RenterDashboardResponse; sharePreviewUrl?: string | null }>("/api/renter/share-report", {
     method: "POST",
     body: JSON.stringify(input)
+  });
+}
+
+export function acceptRenterScoreRequest(linkedCaseId: string) {
+  return apiFetch<RenterDashboardResponse>(`/api/renter/linked-cases/${encodeURIComponent(linkedCaseId)}/accept-score-request`, {
+    method: "POST"
   });
 }
 

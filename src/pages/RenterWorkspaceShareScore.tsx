@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Download, Mail, Search, Send, Share2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ function isValidEmail(value: string) {
 
 export default function RenterWorkspaceShareScore() {
   const { data, shareScoreReport } = useRenterWorkspace();
+  const [searchParams] = useSearchParams();
   const [recipientType, setRecipientType] = useState<"LANDLORD" | "AGENT">("LANDLORD");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPerformed, setSearchPerformed] = useState(false);
@@ -77,9 +79,22 @@ export default function RenterWorkspaceShareScore() {
   }, [data]);
 
   if (!data) return null;
+  const linkedCaseId = searchParams.get("linkedCaseId") || "";
+  const linkedCase = linkedCaseId ? data.linkedCases.find((item) => item.id === linkedCaseId) || null : null;
+  const linkedCaseRequest = linkedCase?.scoreRequests[0] || null;
+  const linkedShareTarget = linkedCaseRequest?.shareTarget || null;
+  const requestAccepted = Boolean(linkedCaseRequest?.acceptedAt);
+  const requestAlreadyShared = Boolean(
+    linkedCaseRequest?.acceptedAt &&
+      linkedCase &&
+      (linkedCase.status === "SCORE_SHARED" ||
+        linkedCase.status === "UNDER_REVIEW" ||
+        linkedCase.status === "DECISION_READY" ||
+        linkedCase.decision)
+  );
   const fileStem = (data.profile.organizationName || data.profile.firstName || "renter").toLowerCase().replace(/\s+/g, "-");
   const scoreGuidance = rentScoreGuidance(data.rentScore.summary.score);
-  const reportReady = data.reportAccess.canShareOrDownload;
+  const reportReady = linkedCase ? requestAccepted && data.reportAccess.canShareOrDownload : data.reportAccess.canShareOrDownload;
   const shouldShowGuidance =
     Boolean(selectedRecipient) ||
     Boolean(draft.firstName.trim()) ||
@@ -139,8 +154,27 @@ export default function RenterWorkspaceShareScore() {
   }
 
   async function submitShare() {
+    if (linkedCase && requestAlreadyShared) {
+      toast.error("This rent score request has already been fulfilled. Wait for a new landlord request before sharing again.");
+      return;
+    }
     if (!reportReady) {
-      toast.error("Your rent score report is not ready yet.");
+      toast.error(linkedCase ? "Accept the landlord request before sharing your rent score." : "Your rent score report is not ready yet.");
+      return;
+    }
+    if (linkedCase && linkedShareTarget) {
+      setSubmitting(true);
+      const result = await shareScoreReport({
+        linkedCaseId: linkedCase.id,
+        recipientEmail: linkedShareTarget.email,
+        recipientType: linkedShareTarget.type,
+        note: draft.note || undefined
+      });
+      if (result.success) {
+        setSharePreviewUrl(result.previewUrl || null);
+        setDraft(emptyDraft);
+      }
+      setSubmitting(false);
       return;
     }
     if (!draft.firstName.trim()) {
@@ -197,7 +231,9 @@ export default function RenterWorkspaceShareScore() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Share score</p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Share your rent score report with a landlord or agent</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Use this page to search, share, and keep a clean record of who has received your current rent score report.
+          {linkedCase
+            ? "This share is tied to a landlord decision request so the correct property contact receives your rent score."
+            : "Use this page to search, share, and keep a clean record of who has received your current rent score report."}
         </p>
       </div>
 
@@ -233,7 +269,7 @@ export default function RenterWorkspaceShareScore() {
             </div>
             {!reportReady ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Your rent score report is not ready yet.
+                {linkedCase ? "Accept the landlord request in Landlord Decision before sharing this report." : "Your rent score report is not ready yet."}
               </div>
             ) : null}
             <Button variant="outline" onClick={downloadReport} disabled={!reportReady}>
@@ -261,38 +297,60 @@ export default function RenterWorkspaceShareScore() {
             <CardTitle className="text-lg">Share report</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Recipient type</Label>
-              <select
-                value={recipientType}
-                onChange={(event) => resetSearchFlow(event.target.value === "AGENT" ? "AGENT" : "LANDLORD")}
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="LANDLORD">Landlord</option>
-                <option value="AGENT">Agent</option>
-              </select>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-slate-950">Search recipient</p>
-              <p className="mt-1 text-sm text-slate-600">
-                To start input either email, phone number, first name, or last name of the landlord or agent.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Email, phone, first name, or last name"
-                  className="bg-white"
-                />
-                <Button variant="outline" onClick={() => void runSearch()} disabled={searchLoading}>
-                  <Search className="mr-2 h-4 w-4" />
-                  {searchLoading ? "Searching..." : "Search"}
-                </Button>
+            {linkedCase && linkedShareTarget ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-950">Requested share target</p>
+                <p className="mt-2 text-sm text-slate-600">Property: {linkedCase.property.name}</p>
+                <p className="text-sm text-slate-600">
+                  {linkedCase.property.address}, {linkedCase.property.city}, {linkedCase.property.state}
+                </p>
+                <p className="mt-3 font-medium text-slate-950">{linkedShareTarget.name}</p>
+                <p className="text-sm text-slate-600">
+                  {linkedShareTarget.type.toLowerCase()} · {linkedShareTarget.email}
+                </p>
+                {linkedCaseRequest?.acceptedAt ? (
+                  <p className="mt-2 text-sm text-emerald-700">Request accepted on {formatDate(linkedCaseRequest.acceptedAt)}</p>
+                ) : null}
+                {requestAlreadyShared ? (
+                  <p className="mt-2 text-sm text-slate-500">This request has already received your shared rent score. A new request is required before you can share again.</p>
+                ) : null}
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Recipient type</Label>
+                  <select
+                    value={recipientType}
+                    onChange={(event) => resetSearchFlow(event.target.value === "AGENT" ? "AGENT" : "LANDLORD")}
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="LANDLORD">Landlord</option>
+                    <option value="AGENT">Agent</option>
+                  </select>
+                </div>
 
-            {searchPerformed && searchResults.length ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-950">Search recipient</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    To start input either email, phone number, first name, or last name of the landlord or agent.
+                  </p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Email, phone, first name, or last name"
+                      className="bg-white"
+                    />
+                    <Button variant="outline" onClick={() => void runSearch()} disabled={searchLoading}>
+                      <Search className="mr-2 h-4 w-4" />
+                      {searchLoading ? "Searching..." : "Search"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!linkedCase && searchPerformed && searchResults.length ? (
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-slate-950">Available recipients</p>
                 {searchResults.map((result) => (
@@ -321,48 +379,52 @@ export default function RenterWorkspaceShareScore() {
               </div>
             ) : null}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>First name</Label>
-                <Input
-                  value={draft.firstName}
-                  onChange={(event) => setDraft((current) => ({ ...current, firstName: event.target.value }))}
-                  placeholder={`Enter ${recipientType.toLowerCase()} first name`}
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Last name</Label>
-                <Input
-                  value={draft.lastName}
-                  onChange={(event) => setDraft((current) => ({ ...current, lastName: event.target.value }))}
-                  placeholder={`Enter ${recipientType.toLowerCase()} last name`}
-                  className="bg-white"
-                />
-              </div>
-            </div>
+            {!linkedCase ? (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>First name</Label>
+                    <Input
+                      value={draft.firstName}
+                      onChange={(event) => setDraft((current) => ({ ...current, firstName: event.target.value }))}
+                      placeholder={`Enter ${recipientType.toLowerCase()} first name`}
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last name</Label>
+                    <Input
+                      value={draft.lastName}
+                      onChange={(event) => setDraft((current) => ({ ...current, lastName: event.target.value }))}
+                      placeholder={`Enter ${recipientType.toLowerCase()} last name`}
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={draft.email}
-                  onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
-                  placeholder={`Enter ${recipientType.toLowerCase()} email`}
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={draft.phone}
-                  onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))}
-                  placeholder={`Enter ${recipientType.toLowerCase()} phone number`}
-                  className="bg-white"
-                />
-              </div>
-            </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={draft.email}
+                      onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
+                      placeholder={`Enter ${recipientType.toLowerCase()} email`}
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={draft.phone}
+                      onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))}
+                      placeholder={`Enter ${recipientType.toLowerCase()} phone number`}
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Share note</Label>
@@ -377,10 +439,16 @@ export default function RenterWorkspaceShareScore() {
             <Button
               className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
               onClick={() => void submitShare()}
-              disabled={submitting || !draft.email.trim() || !reportReady}
+              disabled={submitting || (!linkedCase && !draft.email.trim()) || !reportReady || requestAlreadyShared}
             >
               <Send className="mr-2 h-4 w-4" />
-              {submitting ? "Sharing..." : "Share report"}
+              {submitting
+                ? "Sharing..."
+                : requestAlreadyShared
+                  ? "Rent score already shared"
+                  : linkedCase && linkedShareTarget
+                    ? `Share with ${linkedShareTarget.type.toLowerCase()}`
+                    : "Share report"}
             </Button>
           </CardContent>
         </Card>

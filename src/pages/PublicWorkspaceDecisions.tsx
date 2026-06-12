@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
-import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   decideWorkspaceProposedRenter,
   forwardWorkspaceScoreRequest,
@@ -47,6 +47,31 @@ function decisionLabel(decision?: string | null) {
   if (decision === "APPROVED") return "Approved";
   if (decision === "DECLINED") return "Declined";
   return decision || "Pending";
+}
+
+function scoreBandBadgeClass(scoreBand?: string | null) {
+  if (scoreBand === "STRONG") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (scoreBand === "STABLE") return "border-sky-200 bg-sky-50 text-sky-700";
+  if (scoreBand === "WATCH") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (scoreBand === "RISK") return "border-rose-200 bg-rose-50 text-rose-700";
+  return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function renderRentScoreValue(input: {
+  linkedRentScore: QueueListItem["linkedRentScore"] | QueueDetail["linkedRentScore"];
+  linkedRentScoreReport?: QueueDetail["linkedRentScoreReport"] | null;
+  status?: string | null;
+}) {
+  if (input.linkedRentScoreReport) {
+    return `${input.linkedRentScoreReport.summary.score} / ${input.linkedRentScoreReport.summary.maxScore}`;
+  }
+  if (input.status === "SCORE_SHARED" || input.status === "UNDER_REVIEW" || input.status === "DECISION_READY") {
+    return "Report ready";
+  }
+  if (input.linkedRentScore) {
+    return `${input.linkedRentScore.score} / 900`;
+  }
+  return "In progress";
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -217,7 +242,11 @@ export default function PublicWorkspaceDecisions() {
             <h1>RentSure Rent Score Report</h1>
             <p><strong>Proposed renter:</strong> ${escapeHtml(renter)}</p>
             <p><strong>Property:</strong> ${escapeHtml(propertyDisplayName(detail.property))}</p>
-            <p><strong>Unit:</strong> ${escapeHtml(propertyUnitDisplayName(detail.propertyUnit))}</p>
+            <p><strong>Unit:</strong> ${escapeHtml(
+              detail.propertyUnit
+                ? `${propertyUnitDisplayName(detail.propertyUnit)} · ${occupancyLabel(detail.propertyUnit.isOccupied)}`
+                : propertyUnitDisplayName(detail.propertyUnit)
+            )}</p>
             <p><strong>Property address:</strong> ${escapeHtml(detail.property.address)}, ${escapeHtml(detail.property.city)}, ${escapeHtml(detail.property.state)}</p>
             <p><strong>Landlord decision:</strong> ${escapeHtml(currentDecisionLabel)}</p>
           </div>
@@ -330,7 +359,14 @@ export default function PublicWorkspaceDecisions() {
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                        <p className="font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                          {item.propertyUnit ? (
+                            <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
+                              {occupancyLabel(item.propertyUnit.isOccupied)}
+                            </Badge>
+                          ) : null}
+                        </div>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
@@ -345,7 +381,10 @@ export default function PublicWorkspaceDecisions() {
                       {!isAgent ? (
                         <SummaryRow
                           label="Rent score"
-                          value={item.linkedRentScore ? `${item.linkedRentScore.score} / 900` : "In progress"}
+                          value={renderRentScoreValue({
+                            linkedRentScore: item.linkedRentScore,
+                            status: item.status
+                          })}
                         />
                       ) : null}
                       <SummaryRow label="Decision" value={decisionLabel(item.decision?.decision || item.status)} />
@@ -377,17 +416,95 @@ export default function PublicWorkspaceDecisions() {
                           <SummaryRow label="Email" value={detail.email} />
                           <SummaryRow label="Phone" value={detail.phone} />
                           <SummaryRow label="Property" value={propertyDisplayName(detail.property)} />
-                          <SummaryRow label="Unit" value={propertyUnitDisplayName(detail.propertyUnit)} />
+                          <SummaryRow
+                            label="Unit"
+                            value={
+                              detail.propertyUnit
+                                ? `${propertyUnitDisplayName(detail.propertyUnit)} · ${occupancyLabel(detail.propertyUnit.isOccupied)}`
+                                : propertyUnitDisplayName(detail.propertyUnit)
+                            }
+                          />
                           <SummaryRow label="Address" value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`} />
                           {!isAgent ? (
                             <SummaryRow
                               label="Rent score"
-                              value={detail.linkedRentScore ? `${detail.linkedRentScore.score} / 900` : "In progress"}
+                              value={renderRentScoreValue({
+                                linkedRentScore: detail.linkedRentScore,
+                                linkedRentScoreReport: detail.linkedRentScoreReport,
+                                status: detail.status
+                              })}
                             />
                           ) : null}
                         </div>
                       </div>
                     </div>
+
+                    {!isAgent && detail.linkedRentScoreReport ? (
+                      <div className="rounded-2xl border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.12),_transparent_38%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] px-3 py-4 md:px-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">Rent score report</p>
+                            <div className="mt-3 flex flex-wrap items-end gap-3">
+                              <p className="text-4xl font-bold tracking-[-0.04em] text-slate-950">
+                                {detail.linkedRentScoreReport.summary.score}
+                                <span className="ml-2 text-lg font-medium text-slate-400">
+                                  / {detail.linkedRentScoreReport.summary.maxScore}
+                                </span>
+                              </p>
+                              <Badge className={scoreBandBadgeClass(detail.linkedRentScoreReport.summary.scoreBand)} variant="outline">
+                                {detail.linkedRentScoreReport.summary.scoreBand}
+                              </Badge>
+                            </div>
+                            <p className="mt-2 text-sm text-slate-600">
+                              Shared report is ready for landlord review.
+                            </p>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[360px]">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Positive</p>
+                              <p className="mt-2 text-2xl font-semibold text-emerald-700">
+                                +{detail.linkedRentScoreReport.summary.positivePoints}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Negative</p>
+                              <p className="mt-2 text-2xl font-semibold text-rose-700">
+                                {detail.linkedRentScoreReport.summary.negativePoints}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                              <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Events</p>
+                              <p className="mt-2 text-2xl font-semibold text-slate-950">
+                                {detail.linkedRentScoreReport.summary.eventCount}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                          {detail.linkedRentScoreReport.breakdown.filter((item) => item.appliedOccurrences > 0).slice(0, 6).map((item) => (
+                            <div key={item.ruleId} className="rounded-2xl border border-slate-200 bg-white p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-medium text-slate-950">{item.name}</p>
+                                  <p className="mt-1 text-sm text-slate-500">
+                                    Applied {item.appliedOccurrences} time{item.appliedOccurrences === 1 ? "" : "s"}
+                                  </p>
+                                </div>
+                                <span className={`text-sm font-semibold ${item.contribution >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                                  {item.contribution > 0 ? "+" : ""}
+                                  {item.contribution}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          {!detail.linkedRentScoreReport.breakdown.some((item) => item.appliedOccurrences > 0) ? (
+                            <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-500">
+                              No scored activity has been recorded yet for this renter.
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                       <div className="flex flex-wrap gap-3">
@@ -410,14 +527,14 @@ export default function PublicWorkspaceDecisions() {
                           </Button>
                         ) : null}
                         {!isAgent ? (
-                          <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport || !detail.decision}>
+                          <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport}>
                             <Download className="mr-2 h-4 w-4" />
                             Download report
                           </Button>
                         ) : null}
                       </div>
-                      {!detail.decision && !isAgent ? (
-                        <p className="mt-3 text-sm text-slate-500">Download report unlocks after a landlord decision is made.</p>
+                      {!detail.linkedRentScoreReport && !isAgent ? (
+                        <p className="mt-3 text-sm text-slate-500">Download report becomes available once the renter shares a rent score report.</p>
                       ) : null}
                     </div>
 

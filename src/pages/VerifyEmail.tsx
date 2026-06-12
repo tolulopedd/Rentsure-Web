@@ -37,17 +37,17 @@ type CompleteSignupResponse = {
 
 function getPasswordRequirementStates(password: string) {
   return [
-    { label: "8+ chars", met: password.length >= 8 },
+    { label: "6+ characters", met: password.length >= 6 },
     { label: "Uppercase", met: /[A-Z]/.test(password) },
-    { label: "Lowercase", met: /[a-z]/.test(password) },
-    { label: "Number", met: /\d/.test(password) },
-    { label: "Special", met: /[^A-Za-z0-9]/.test(password) }
+    { label: "Lowercase", met: /[a-z]/.test(password) }
   ];
 }
 
 function strongPasswordError(password: string) {
-  const failedRequirement = getPasswordRequirementStates(password).find((item) => !item.met);
-  return failedRequirement ? `Password requirement: ${failedRequirement.label}.` : null;
+  if (password.length < 6) return "Password must be at least 6 characters.";
+  if (!/[A-Z]/.test(password)) return "Password must include at least one uppercase letter.";
+  if (!/[a-z]/.test(password)) return "Password must include at least one lowercase letter.";
+  return null;
 }
 
 export default function VerifyEmail() {

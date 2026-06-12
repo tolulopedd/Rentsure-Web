@@ -125,6 +125,7 @@ export type QueueListItem = {
     state: string;
     bedroomCount: number;
     bathroomCount: number;
+    isOccupied: boolean;
   } | null;
   linkedRentScore: LinkedRentScoreSummary;
   decision: {
@@ -475,6 +476,17 @@ export function shareWorkspaceProperty(propertyId: string, sharedWithEmail: stri
     method: "POST",
     body: JSON.stringify({ sharedWithEmail })
   });
+}
+
+export type WorkspaceAgentSearchResult = {
+  id: string;
+  name: string;
+  email: string;
+};
+
+export function searchWorkspaceAgents(q: string) {
+  const search = new URLSearchParams({ q });
+  return apiFetch<{ items: WorkspaceAgentSearchResult[] }>(`/api/workspace/agent-search?${search.toString()}`);
 }
 
 export function listWorkspaceQueue() {

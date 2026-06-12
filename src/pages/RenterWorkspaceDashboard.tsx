@@ -124,9 +124,6 @@ export default function RenterWorkspaceDashboard() {
               <ScoreAction label="Profile" value={`${data.summary.profileCompletenessPercent}% profile confidence`} />
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
-              <Button asChild className="w-full bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)] xl:w-auto">
-                <Link to="/account/renter/share-score">Share rent score</Link>
-              </Button>
               <Button asChild variant="outline" className="w-full xl:w-auto">
                 <Link to="/account/renter/payments">Confirm payments</Link>
               </Button>
@@ -261,12 +258,6 @@ export default function RenterWorkspaceDashboard() {
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <Badge className={scoreBandBadgeClass(share.scoreBand)}>{share.scoreBand}</Badge>
-                  <Button asChild variant="ghost" size="sm" className="px-0 text-[var(--rentsure-blue)] hover:bg-transparent">
-                    <Link to="/account/renter/share-score">
-                      Share again
-                      <ArrowRight className="ml-1 h-4 w-4" />
-                    </Link>
-                  </Button>
                 </div>
               </div>
             ))}

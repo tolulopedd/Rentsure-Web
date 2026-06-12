@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
-import { propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   confirmWorkspacePaymentSchedule,
   createWorkspacePaymentSchedule,
@@ -177,9 +177,9 @@ export default function PublicWorkspacePayments() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Payments</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Payments</h1>
         <Button
           type="button"
           variant={showScheduleForm ? "outline" : "default"}
@@ -198,7 +198,7 @@ export default function PublicWorkspacePayments() {
         </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.4fr]">
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Tenants</CardTitle>
@@ -211,17 +211,24 @@ export default function PublicWorkspacePayments() {
                 key={item.id}
                 type="button"
                 onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition ${
+                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
                   selectedId === item.id
                     ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
                     : "border-slate-200 bg-white hover:bg-slate-50"
                 }`}
               >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{renterName(item)}</p>
                     <p className="text-sm text-slate-600">{propertyDisplayName(item.property)}</p>
-                    <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                      <span>{propertyUnitDisplayName(item.propertyUnit)}</span>
+                      {item.propertyUnit ? (
+                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
+                          {occupancyLabel(item.propertyUnit.isOccupied)}
+                        </Badge>
+                      ) : null}
+                    </div>
                     <p className="text-xs text-muted-foreground">{item.property.address}</p>
                   </div>
                   <div className="text-right">
@@ -237,12 +244,12 @@ export default function PublicWorkspacePayments() {
           <CardHeader>
             <CardTitle className="text-lg">Payment schedules</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4 md:space-y-5">
             {detailLoading ? <p className="text-sm text-muted-foreground">Loading payment detail...</p> : null}
             {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a renter case to manage payments.</p> : null}
             {detail ? (
               <>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.85fr)]">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -253,20 +260,34 @@ export default function PublicWorkspacePayments() {
                       </div>
                       <p className="text-sm text-slate-600">{detail.email} · {detail.phone}</p>
                       <p className="text-sm text-slate-600">{propertyDisplayName(detail.property)}</p>
-                      <p className="text-sm text-slate-600">{propertyUnitDisplayName(detail.propertyUnit)}</p>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>{propertyUnitDisplayName(detail.propertyUnit)}</span>
+                        {detail.propertyUnit ? (
+                          <Badge className={occupancyBadgeClass(detail.propertyUnit.isOccupied)} variant="outline">
+                            {occupancyLabel(detail.propertyUnit.isOccupied)}
+                          </Badge>
+                        ) : null}
+                      </div>
                       <p className="text-xs text-muted-foreground">{detail.property.address}</p>
                     </div>
                     <div className="space-y-2 text-sm text-slate-600">
                       <SummaryRow label="Decision" value={detail.decision?.decision || "APPROVED"} />
                       <SummaryRow label="Schedules" value={`${detail.paymentSchedules.length}`} />
                       <SummaryRow label="Property" value={propertyDisplayName(detail.property)} />
-                      <SummaryRow label="Unit" value={propertyUnitDisplayName(detail.propertyUnit)} />
+                      <SummaryRow
+                        label="Unit"
+                        value={
+                          detail.propertyUnit
+                            ? `${propertyUnitDisplayName(detail.propertyUnit)} · ${occupancyLabel(detail.propertyUnit.isOccupied)}`
+                            : propertyUnitDisplayName(detail.propertyUnit)
+                        }
+                      />
                     </div>
                   </div>
                 </div>
 
                 {showScheduleForm ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label>Payment type</Label>
@@ -295,7 +316,7 @@ export default function PublicWorkspacePayments() {
                         <Label>Note</Label>
                         <Textarea value={scheduleDraft.note} onChange={(event) => setScheduleDraft((current) => ({ ...current, note: event.target.value }))} className="bg-white" />
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-sm font-semibold text-slate-950">Future recurrence</p>
@@ -362,7 +383,7 @@ export default function PublicWorkspacePayments() {
                   <p className="text-sm font-semibold text-slate-950">Payment requests</p>
                   {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules logged yet.</p> : null}
                   {detail.paymentSchedules.map((schedule) => (
-                    <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                    <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
                         <div className="space-y-2">
                           <p className="font-semibold text-slate-950">{schedule.paymentType.replaceAll("_", " ")}</p>

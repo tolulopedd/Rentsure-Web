@@ -540,8 +540,7 @@ export default function Landing() {
               <div>
                 <BrandLogo size="sm" />
                 <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-                  RentSure helps tenants build trust early and helps landlords or agents make rental decisions with
-                  more confidence.
+              RentSure helps tenants build trust early and helps landlords or agents make rental decisions with more confidence.
                 </p>
                 <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--rentsure-blue)]/10 bg-[var(--rentsure-blue-soft)]/50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
                   <span className="h-2 w-2 rounded-full bg-[var(--rentsure-blue)]" />

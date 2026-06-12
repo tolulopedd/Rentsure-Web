@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Camera, ImagePlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,11 +21,24 @@ export function PassportPhotoCard(props: {
   helperText: string;
   onSelectFile: (file: File) => void | Promise<void>;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [props.imageUrl]);
+
   return (
     <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <Avatar className="h-24 w-24 rounded-[1.5rem] border border-slate-200 bg-slate-50">
-          {props.imageUrl ? <AvatarImage src={props.imageUrl} alt={props.name} className="object-cover" /> : null}
+          {props.imageUrl && !imageFailed ? (
+            <AvatarImage
+              src={props.imageUrl}
+              alt={props.name}
+              className="object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : null}
           <AvatarFallback className="rounded-[1.5rem] bg-gradient-to-br from-[var(--rentsure-blue)] to-[var(--rentsure-blue-deep)] text-lg font-semibold text-white">
             {initials(props.name)}
           </AvatarFallback>

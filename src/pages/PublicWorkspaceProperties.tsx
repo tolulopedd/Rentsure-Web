@@ -14,13 +14,16 @@ import {
   formatNigeriaFallbackAddress,
   NIGERIA_ADDRESS_PLACEHOLDER
 } from "@/lib/nigeria-address";
+import { occupancyBadgeClass, occupancyLabel, propertyUnitsStatusSummary } from "@/lib/property-display";
 import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 import {
   createWorkspaceProperty,
   listWorkspaceProperties,
+  searchWorkspaceAgents,
   shareWorkspaceProperty,
   updateWorkspaceProperty,
+  type WorkspaceAgentSearchResult,
   type WorkspaceProperty
 } from "@/lib/public-workspace-api";
 
@@ -78,6 +81,9 @@ export default function PublicWorkspaceProperties() {
   const [items, setItems] = useState<WorkspaceProperty[]>([]);
   const [draft, setDraft] = useState<PropertyDraft>(() => createInitialDraft());
   const [shareEmailById, setShareEmailById] = useState<Record<string, string>>({});
+  const [shareSuggestionsById, setShareSuggestionsById] = useState<Record<string, WorkspaceAgentSearchResult[]>>({});
+  const [shareLookupLoadingById, setShareLookupLoadingById] = useState<Record<string, boolean>>({});
+  const [shareOpenById, setShareOpenById] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -500,6 +506,26 @@ export default function PublicWorkspaceProperties() {
     }
   }
 
+  async function searchAgentEmails(propertyId: string, value: string) {
+    const query = value.trim();
+    if (query.length < 2) {
+      setShareSuggestionsById((current) => ({ ...current, [propertyId]: [] }));
+      setShareLookupLoadingById((current) => ({ ...current, [propertyId]: false }));
+      return;
+    }
+
+    try {
+      setShareLookupLoadingById((current) => ({ ...current, [propertyId]: true }));
+      const response = await searchWorkspaceAgents(query);
+      setShareSuggestionsById((current) => ({ ...current, [propertyId]: response.items }));
+      setShareOpenById((current) => ({ ...current, [propertyId]: true }));
+    } catch {
+      setShareSuggestionsById((current) => ({ ...current, [propertyId]: [] }));
+    } finally {
+      setShareLookupLoadingById((current) => ({ ...current, [propertyId]: false }));
+    }
+  }
+
   const visibleCitySuggestions = citySuggestions.length
     ? citySuggestions.map((suggestion) => ({
         key: suggestion.mapbox_id,
@@ -571,7 +597,7 @@ export default function PublicWorkspaceProperties() {
                 label="Property description"
                 value={draft.name}
                 onChange={(value) => setDraft((current) => ({ ...current, name: value }))}
-                placeholder="3 bedroom flat at Forthright Estate"
+                placeholder="4 Units of Flats at Forthright Estate"
               />
               <div className="space-y-2">
                 <Label>Property type</Label>
@@ -729,12 +755,14 @@ export default function PublicWorkspaceProperties() {
                 value={draft.ownerName}
                 onChange={(value) => setDraft((current) => ({ ...current, ownerName: value }))}
                 placeholder={isLandlord ? "Defaults to your landlord profile" : "Enter landlord name"}
+                readOnly={Boolean(editingPropertyId) && isLandlord}
               />
               <TextField
                 label="Landlord email"
                 value={draft.landlordEmail}
                 onChange={(value) => setDraft((current) => ({ ...current, landlordEmail: value }))}
                 placeholder={isLandlord ? "Defaults to your verified landlord email" : "Enter landlord email"}
+                readOnly={Boolean(editingPropertyId) && isLandlord}
               />
             </div>
 
@@ -940,10 +968,7 @@ export default function PublicWorkspaceProperties() {
                   <RowLabel label="Type" value={property.propertyType || "Property"} />
                   <RowLabel label="Rooms" value={`${property.bedroomCount}`} />
                   <RowLabel label="Bathrooms" value={`${property.bathroomCount}`} />
-                  <RowLabel
-                    label="Unit details"
-                    value={property.units.map((unit) => unit.label).join(", ") || "Main property"}
-                  />
+                  <RowLabel label="Unit details" value={propertyUnitsStatusSummary(property.units)} />
                 </div>
 
                 <div className="space-y-3">
@@ -968,18 +993,63 @@ export default function PublicWorkspaceProperties() {
                     </div>
                   )}
 
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Units</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {property.units.map((unit) => (
+                        <Badge key={unit.id} className={occupancyBadgeClass(unit.isOccupied)} variant="outline">
+                          {unit.label} · {occupancyLabel(unit.isOccupied)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
                   {isLandlord ? (
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                      <Input
-                        value={shareEmailById[property.id] || ""}
-                        onChange={(event) =>
-                          setShareEmailById((current) => ({ ...current, [property.id]: event.target.value }))
-                        }
-                        placeholder="Share with agent email"
-                        className="bg-white"
-                      />
+                      <div
+                        className="relative"
+                        onBlur={(event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                            setShareOpenById((current) => ({ ...current, [property.id]: false }));
+                          }
+                        }}
+                      >
+                        <Input
+                          value={shareEmailById[property.id] || ""}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setShareEmailById((current) => ({ ...current, [property.id]: value }));
+                            void searchAgentEmails(property.id, value);
+                          }}
+                          onFocus={() => {
+                            if ((shareSuggestionsById[property.id] || []).length) {
+                              setShareOpenById((current) => ({ ...current, [property.id]: true }));
+                            }
+                          }}
+                          placeholder="Search agent email"
+                          className="bg-white"
+                        />
+                        {shareOpenById[property.id] && (shareLookupLoadingById[property.id] || (shareSuggestionsById[property.id] || []).length > 0) ? (
+                          <LovPanel>
+                            {shareLookupLoadingById[property.id] ? <LovEmpty text="Searching agents..." /> : null}
+                            {!shareLookupLoadingById[property.id] &&
+                            (shareSuggestionsById[property.id] || []).map((agent) => (
+                              <LovButton
+                                key={agent.id}
+                                onClick={() => {
+                                  setShareEmailById((current) => ({ ...current, [property.id]: agent.email }));
+                                  setShareOpenById((current) => ({ ...current, [property.id]: false }));
+                                }}
+                              >
+                                <span>{agent.email}</span>
+                                <span className="text-xs uppercase tracking-[0.12em] text-slate-400">{agent.name}</span>
+                              </LovButton>
+                            ))}
+                          </LovPanel>
+                        ) : null}
+                      </div>
                       <Button variant="outline" onClick={() => void shareProperty(property.id)}>
-                        Share
+                        Share with Agent
                       </Button>
                     </div>
                   ) : null}
@@ -997,17 +1067,26 @@ function TextField({
   label,
   value,
   onChange,
-  placeholder
+  placeholder,
+  readOnly = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} className="bg-white" placeholder={placeholder} />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={readOnly ? "bg-slate-50 text-slate-500" : "bg-white"}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        disabled={readOnly}
+      />
     </div>
   );
 }

@@ -31,6 +31,13 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResetPasswordResponse | null>(null);
 
+  function passwordError(value: string) {
+    if (value.length < 6) return "Password must be at least 6 characters.";
+    if (!/[A-Z]/.test(value)) return "Password must include at least one uppercase letter.";
+    if (!/[a-z]/.test(value)) return "Password must include at least one lowercase letter.";
+    return null;
+  }
+
   usePageSeo({
     title: "RentSure | Reset Password",
     description: "Request a RentSure password reset link.",
@@ -44,6 +51,11 @@ export default function ResetPassword() {
       if (isTokenFlow) {
         if (!password.trim()) {
           toast.error("Enter a new password.");
+          return;
+        }
+        const nextPasswordError = passwordError(password);
+        if (nextPasswordError) {
+          toast.error(nextPasswordError);
           return;
         }
         if (password !== confirmPassword) {
@@ -198,9 +210,7 @@ export default function ResetPassword() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs leading-5 text-slate-500">
-                      Use at least 8 characters with uppercase, lowercase, number, and special character.
-                    </p>
+                    <p className="text-xs leading-5 text-slate-500">Use at least 6 characters with one uppercase and one lowercase letter.</p>
                   </>
                 ) : (
                   <div className="space-y-2">
