@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Minus, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1103,13 +1103,32 @@ function NumberField({
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input
-        className="bg-white"
-        type="number"
-        min={1}
-        value={value}
-        onChange={(event) => onChange(Math.max(1, Number(event.target.value) || 1))}
-      />
+      <div className="flex items-center overflow-hidden rounded-md border border-input bg-white shadow-sm">
+        <button
+          type="button"
+          className="flex h-11 w-11 items-center justify-center border-r border-slate-200 text-slate-600 transition hover:bg-slate-50 active:bg-slate-100"
+          onClick={() => onChange(Math.max(1, value - 1))}
+          aria-label={`Decrease ${label.toLowerCase()}`}
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <Input
+          className="h-11 rounded-none border-0 text-center shadow-none focus-visible:ring-0"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value}
+          onChange={(event) => onChange(Math.max(1, Number(event.target.value.replace(/\D/g, "")) || 1))}
+        />
+        <button
+          type="button"
+          className="flex h-11 w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition hover:bg-slate-50 active:bg-slate-100"
+          onClick={() => onChange(value + 1)}
+          aria-label={`Increase ${label.toLowerCase()}`}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
