@@ -561,6 +561,10 @@ export default function PublicWorkspaceDecisions() {
                           <p className="text-sm text-slate-500">
                             Decision actions unlock once the rent score report is ready.
                           </p>
+                        ) : detail.decision ? (
+                          <p className="text-sm text-slate-500">
+                            A decision has already been recorded for this renter. Approve, request for additional information, and decline are now locked.
+                          </p>
                         ) : null}
                         <div className="space-y-2">
                           <Label>Decision note</Label>
@@ -569,19 +573,23 @@ export default function PublicWorkspaceDecisions() {
                             onChange={(event) => setDecisionNote(event.target.value)}
                             placeholder="Why are you approving, holding, or declining this renter?"
                             className="bg-white"
-                            disabled={!detail.linkedRentScoreReport}
+                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
                           />
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3">
                           <Button
                             onClick={() => void takeDecision("APPROVED")}
                             className="bg-emerald-600 hover:bg-emerald-700"
-                            disabled={!detail.linkedRentScoreReport}
+                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
                           >
                             <ShieldCheck className="mr-2 h-4 w-4" />
                             Approve
                           </Button>
-                          <Button variant="outline" onClick={() => void takeDecision("HOLD")} disabled={!detail.linkedRentScoreReport}>
+                          <Button
+                            variant="outline"
+                            onClick={() => void takeDecision("HOLD")}
+                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
+                          >
                             <PauseCircle className="mr-2 h-4 w-4" />
                             Request for additional information
                           </Button>
@@ -589,7 +597,7 @@ export default function PublicWorkspaceDecisions() {
                             variant="outline"
                             className="border-rose-200 text-rose-700 hover:bg-rose-50"
                             onClick={() => void takeDecision("DECLINED")}
-                            disabled={!detail.linkedRentScoreReport}
+                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
                           >
                             <ShieldX className="mr-2 h-4 w-4" />
                             Decline
