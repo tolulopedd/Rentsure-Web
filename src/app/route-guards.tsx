@@ -38,7 +38,7 @@ export function ManageRoute({ element }: { element: ReactElement }) {
   }
   const role = getStoredUserRole();
   if (!canManagePortal(role)) {
-    return <Navigate to={isAdminPortalRole(role) ? "/app/rent-score" : "/app/dashboard"} replace />;
+    return <Navigate to={isAdminPortalRole(role) ? "/app/renters" : "/app/dashboard"} replace />;
   }
   return element;
 }

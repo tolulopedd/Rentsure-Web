@@ -14,7 +14,7 @@ import {
   formatNigeriaFallbackAddress,
   NIGERIA_ADDRESS_PLACEHOLDER
 } from "@/lib/nigeria-address";
-import { occupancyBadgeClass, occupancyLabel, propertyUnitsStatusSummary } from "@/lib/property-display";
+import { occupancyBadgeClass, occupancyLabel } from "@/lib/property-display";
 import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 import {
@@ -41,6 +41,7 @@ type PropertyDraft = {
     label: string;
     bedroomCount: number;
     bathroomCount: number;
+    annualRentAmountNgn: string;
     isOccupied: boolean;
     currentTenantName: string;
     currentTenantEmail: string;
@@ -68,6 +69,7 @@ function createInitialDraft(): PropertyDraft {
         label: "Ground Floor",
         bedroomCount: 2,
         bathroomCount: 2,
+        annualRentAmountNgn: "",
         isOccupied: false,
         currentTenantName: "",
         currentTenantEmail: "",
@@ -79,6 +81,7 @@ function createInitialDraft(): PropertyDraft {
 
 export default function PublicWorkspaceProperties() {
   const [items, setItems] = useState<WorkspaceProperty[]>([]);
+  const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [draft, setDraft] = useState<PropertyDraft>(() => createInitialDraft());
   const [shareEmailById, setShareEmailById] = useState<Record<string, string>>({});
   const [shareSuggestionsById, setShareSuggestionsById] = useState<Record<string, WorkspaceAgentSearchResult[]>>({});
@@ -104,12 +107,19 @@ export default function PublicWorkspaceProperties() {
   const isLandlord = rawRole === "LANDLORD";
   const mapboxAccessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN?.trim() || "";
 
-  async function loadProperties() {
+  async function loadProperties(preferredPropertyId?: string) {
     try {
       setLoading(true);
       setError(null);
       const response = await listWorkspaceProperties();
       setItems(response.items);
+      setSelectedPropertyId((current) =>
+        preferredPropertyId && response.items.some((item) => item.id === preferredPropertyId)
+          ? preferredPropertyId
+          : current && response.items.some((item) => item.id === current)
+            ? current
+            : (response.items[0]?.id ?? "")
+      );
     } catch (loadError: unknown) {
       setError(getErrorMessage(loadError, "Failed to load properties"));
     } finally {
@@ -157,6 +167,7 @@ export default function PublicWorkspaceProperties() {
             label: unit.label,
             bedroomCount: unit.bedroomCount,
             bathroomCount: unit.bathroomCount,
+            annualRentAmountNgn: unit.annualRentAmountNgn == null ? "" : String(unit.annualRentAmountNgn),
             isOccupied: unit.isOccupied,
             currentTenantName: unit.currentTenantName || "",
             currentTenantEmail: unit.currentTenantEmail || "",
@@ -404,6 +415,7 @@ export default function PublicWorkspaceProperties() {
           label: `Unit ${current.units.length + 1}`,
           bedroomCount: 1,
           bathroomCount: 1,
+          annualRentAmountNgn: "",
           isOccupied: false,
           currentTenantName: "",
           currentTenantEmail: "",
@@ -431,6 +443,9 @@ export default function PublicWorkspaceProperties() {
     if (draft.units.some((unit) => !unit.label.trim())) return "Enter a label for each unit detail.";
     if (draft.units.some((unit) => unit.bedroomCount < 1)) return "Enter a valid number of rooms for each unit.";
     if (draft.units.some((unit) => unit.bathroomCount < 1)) return "Enter a valid number of bathrooms for each unit.";
+    if (draft.units.some((unit) => unit.annualRentAmountNgn.trim() && Number(unit.annualRentAmountNgn) <= 0)) {
+      return "Enter a valid annual rent amount for each unit.";
+    }
     if (draft.units.some((unit) => unit.isOccupied && !unit.currentTenantName.trim())) {
       return "Enter the current tenant name for each occupied unit.";
     }
@@ -464,6 +479,7 @@ export default function PublicWorkspaceProperties() {
           label: unit.label.trim(),
           bedroomCount: unit.bedroomCount,
           bathroomCount: unit.bathroomCount,
+          annualRentAmountNgn: unit.annualRentAmountNgn.trim() ? Number(unit.annualRentAmountNgn) : null,
           isOccupied: unit.isOccupied,
           currentTenantName: unit.isOccupied ? unit.currentTenantName.trim() : undefined,
           currentTenantEmail: unit.isOccupied ? unit.currentTenantEmail.trim() : undefined,
@@ -472,12 +488,12 @@ export default function PublicWorkspaceProperties() {
       };
 
       if (editingPropertyId) {
-        const response = await updateWorkspaceProperty(editingPropertyId, payload);
-        setItems(response.items);
+        await updateWorkspaceProperty(editingPropertyId, payload);
+        await loadProperties(editingPropertyId);
         toast.success("Property updated");
       } else {
-        const response = await createWorkspaceProperty(payload);
-        setItems(response.properties);
+        await createWorkspaceProperty(payload);
+        await loadProperties();
         toast.success("Property added to workspace");
       }
 
@@ -497,8 +513,8 @@ export default function PublicWorkspaceProperties() {
     }
 
     try {
-      const response = await shareWorkspaceProperty(propertyId, email);
-      setItems(response.items);
+      await shareWorkspaceProperty(propertyId, email);
+      await loadProperties(propertyId);
       setShareEmailById((current) => ({ ...current, [propertyId]: "" }));
       toast.success("Property shared with agent");
     } catch (shareError: unknown) {
@@ -551,6 +567,8 @@ export default function PublicWorkspaceProperties() {
         city: suggestion.city,
         state: suggestion.state
       }));
+
+  const selectedProperty = items.find((item) => item.id === selectedPropertyId) || null;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -834,6 +852,28 @@ export default function PublicWorkspaceProperties() {
                       />
                     </div>
 
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <CurrencyField
+                        label="Annual rent amount"
+                        value={unit.annualRentAmountNgn}
+                        onChange={(value) =>
+                          setDraft((current) => ({
+                            ...current,
+                            units: current.units.map((entry, unitIndex) =>
+                              unitIndex === index ? { ...entry, annualRentAmountNgn: value } : entry
+                            )
+                          }))
+                        }
+                        placeholder="e.g. 1200000"
+                      />
+                      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                        <p className="font-medium text-slate-950">Rent band input</p>
+                        <p className="mt-1">
+                          This annual rent amount is used to derive the renter-band score for tenants linked to this unit.
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
                       <div className="space-y-2">
                         <Label>Occupancy status</Label>
@@ -942,66 +982,93 @@ export default function PublicWorkspaceProperties() {
             <p className="text-sm text-muted-foreground">No properties linked yet. Use the button above to add your first property.</p>
           ) : null}
 
-          {items.map((property) => (
-            <div key={property.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.9fr)]">
+          {items.length ? (
+            <div className="space-y-2">
+              <Label>Property</Label>
+              <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select property" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {items.map((property) => (
+                    <SelectItem key={property.id} value={property.id}>
+                      {property.summaryLabel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          {selectedProperty ? (
+            <div key={selectedProperty.id} className="rounded-2xl border border-slate-200 bg-white">
+              <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-slate-950">{property.summaryLabel}</p>
-                    <Badge variant="outline">{property.membershipRole}</Badge>
-                    {property.isOccupied ? (
-                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Occupied</Badge>
-                    ) : (
-                      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Vacant</Badge>
-                    )}
+                    <p className="font-semibold text-slate-950">{selectedProperty.summaryLabel}</p>
+                    <Badge variant="outline">{selectedProperty.membershipRole}</Badge>
                   </div>
-                  <p className="text-sm text-slate-600">{property.address}</p>
-                  <p className="text-sm text-slate-500">
-                    {property.city}, {property.state}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    Owner: {property.ownerName} · Landlord email: {property.landlordEmail}
-                  </p>
+                  <p className="text-sm text-slate-600">{selectedProperty.address}</p>
+                  <p className="text-sm text-slate-500">{selectedProperty.city}, {selectedProperty.state}</p>
                 </div>
 
-                <div className="space-y-2 text-sm text-slate-600">
-                  <RowLabel label="Type" value={property.propertyType || "Property"} />
-                  <RowLabel label="Rooms" value={`${property.bedroomCount}`} />
-                  <RowLabel label="Bathrooms" value={`${property.bathroomCount}`} />
-                  <RowLabel label="Unit details" value={propertyUnitsStatusSummary(property.units)} />
-                </div>
-
-                <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3 lg:justify-end">
                   {isLandlord ? (
-                    <div className="flex justify-end">
-                      <Button variant="outline" onClick={() => startEditingProperty(property)}>
-                        Edit property
-                      </Button>
-                    </div>
+                    <Button variant="outline" onClick={() => startEditingProperty(selectedProperty)}>
+                      Edit property
+                    </Button>
                   ) : null}
+                </div>
+              </div>
 
-                  {property.isOccupied ? (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Current tenant</p>
-                      <p className="mt-2 font-medium text-slate-950">{property.currentTenantName || "Tenant linked"}</p>
-                      {property.currentTenantEmail ? <p>{property.currentTenantEmail}</p> : null}
-                      {property.currentTenantPhone ? <p>{property.currentTenantPhone}</p> : null}
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
-                      No current tenant details attached.
-                    </div>
-                  )}
+              <div className="overflow-x-auto px-4 py-4">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-slate-500">
+                      <th className="pb-3 font-medium">Units</th>
+                      <th className="pb-3 font-medium">Details</th>
+                      <th className="pb-3 font-medium">Status</th>
+                      <th className="pb-3 font-medium">Annual rent</th>
+                      <th className="pb-3 font-medium">Current tenant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedProperty.units.map((unit) => (
+                      <tr key={unit.id} className="border-b border-slate-200 last:border-b-0">
+                        <td className="py-3 pr-4 text-slate-950">{unit.label}</td>
+                        <td className="py-3 pr-4 text-slate-600">
+                          {selectedProperty.propertyType || "Property"} · {unit.bedroomCount} rooms · {unit.bathroomCount} baths
+                        </td>
+                        <td className="py-3 pr-4">
+                          <Badge className={occupancyBadgeClass(unit.isOccupied)} variant="outline">
+                            {occupancyLabel(unit.isOccupied)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 pr-4 text-slate-600">
+                          {unit.annualRentAmountNgn == null ? "Not set" : formatNgn(unit.annualRentAmountNgn)}
+                        </td>
+                        <td className="py-3 text-slate-600">
+                          {unit.currentTenantName ? (
+                            <div className="space-y-1">
+                              <p className="font-medium text-slate-950">{unit.currentTenantName}</p>
+                              {unit.currentTenantEmail ? <p>{unit.currentTenantEmail}</p> : null}
+                              {unit.currentTenantPhone ? <p>{unit.currentTenantPhone}</p> : null}
+                            </div>
+                          ) : (
+                            "No tenant linked"
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Units</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {property.units.map((unit) => (
-                        <Badge key={unit.id} className={occupancyBadgeClass(unit.isOccupied)} variant="outline">
-                          {unit.label} · {occupancyLabel(unit.isOccupied)}
-                        </Badge>
-                      ))}
-                    </div>
+              <div className="border-t border-slate-200 px-4 py-4">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-start">
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <RowLabel label="Owner" value={selectedProperty.ownerName} />
+                    <RowLabel label="Landlord email" value={selectedProperty.landlordEmail} />
                   </div>
 
                   {isLandlord ? (
@@ -1010,35 +1077,36 @@ export default function PublicWorkspaceProperties() {
                         className="relative"
                         onBlur={(event) => {
                           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                            setShareOpenById((current) => ({ ...current, [property.id]: false }));
+                            setShareOpenById((current) => ({ ...current, [selectedProperty.id]: false }));
                           }
                         }}
                       >
                         <Input
-                          value={shareEmailById[property.id] || ""}
+                          value={shareEmailById[selectedProperty.id] || ""}
                           onChange={(event) => {
                             const value = event.target.value;
-                            setShareEmailById((current) => ({ ...current, [property.id]: value }));
-                            void searchAgentEmails(property.id, value);
+                            setShareEmailById((current) => ({ ...current, [selectedProperty.id]: value }));
+                            void searchAgentEmails(selectedProperty.id, value);
                           }}
                           onFocus={() => {
-                            if ((shareSuggestionsById[property.id] || []).length) {
-                              setShareOpenById((current) => ({ ...current, [property.id]: true }));
+                            if ((shareSuggestionsById[selectedProperty.id] || []).length) {
+                              setShareOpenById((current) => ({ ...current, [selectedProperty.id]: true }));
                             }
                           }}
                           placeholder="Search agent email"
                           className="bg-white"
                         />
-                        {shareOpenById[property.id] && (shareLookupLoadingById[property.id] || (shareSuggestionsById[property.id] || []).length > 0) ? (
+                        {shareOpenById[selectedProperty.id] &&
+                        (shareLookupLoadingById[selectedProperty.id] || (shareSuggestionsById[selectedProperty.id] || []).length > 0) ? (
                           <LovPanel>
-                            {shareLookupLoadingById[property.id] ? <LovEmpty text="Searching agents..." /> : null}
-                            {!shareLookupLoadingById[property.id] &&
-                            (shareSuggestionsById[property.id] || []).map((agent) => (
+                            {shareLookupLoadingById[selectedProperty.id] ? <LovEmpty text="Searching agents..." /> : null}
+                            {!shareLookupLoadingById[selectedProperty.id] &&
+                            (shareSuggestionsById[selectedProperty.id] || []).map((agent) => (
                               <LovButton
                                 key={agent.id}
                                 onClick={() => {
-                                  setShareEmailById((current) => ({ ...current, [property.id]: agent.email }));
-                                  setShareOpenById((current) => ({ ...current, [property.id]: false }));
+                                  setShareEmailById((current) => ({ ...current, [selectedProperty.id]: agent.email }));
+                                  setShareOpenById((current) => ({ ...current, [selectedProperty.id]: false }));
                                 }}
                               >
                                 <span>{agent.email}</span>
@@ -1048,7 +1116,7 @@ export default function PublicWorkspaceProperties() {
                           </LovPanel>
                         ) : null}
                       </div>
-                      <Button variant="outline" onClick={() => void shareProperty(property.id)}>
+                      <Button variant="outline" onClick={() => void shareProperty(selectedProperty.id)}>
                         Share with Agent
                       </Button>
                     </div>
@@ -1056,7 +1124,7 @@ export default function PublicWorkspaceProperties() {
                 </div>
               </div>
             </div>
-          ))}
+          ) : null}
         </CardContent>
       </Card>
     </div>
@@ -1133,10 +1201,39 @@ function NumberField({
   );
 }
 
+function CurrencyField({
+  label,
+  value,
+  onChange,
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value.replace(/[^\d]/g, ""))}
+        className="bg-white"
+        inputMode="numeric"
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+function formatNgn(value: number) {
+  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
+}
+
 function RowLabel({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
-      <span className="text-slate-500">{label}</span>
+    <div className="flex items-center gap-2 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+      <span className="text-slate-500">{label}:</span>
       <span className="font-medium text-slate-900">{value}</span>
     </div>
   );

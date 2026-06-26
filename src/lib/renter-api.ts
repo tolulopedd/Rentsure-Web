@@ -13,6 +13,8 @@ export type RenterDashboardResponse = {
     state: string;
     city: string;
     address: string;
+    residenceMoveCount5y?: number | null;
+    employerCount5y?: number | null;
     notes?: string | null;
     nin?: string | null;
     ninVerifiedAt?: string | null;
@@ -173,6 +175,15 @@ export type RenterDashboardResponse = {
       receiptReference?: string | null;
       createdBy: string;
     }>;
+    landlordReferenceRequests: Array<{
+      id: string;
+      status: "PENDING" | "COMPLETED" | "DECLINED";
+      recommendation?: "STRONGLY_RECOMMEND" | "RECOMMEND" | "NEUTRAL" | "DO_NOT_RECOMMEND" | null;
+      note?: string | null;
+      requestedAt: string;
+      respondedAt?: string | null;
+      landlordName: string;
+    }>;
     activities: Array<{
       id: string;
       activityType: string;
@@ -196,6 +207,8 @@ export function updateRenterProfile(input: {
   state?: string;
   city?: string;
   address?: string;
+  residenceMoveCount5y?: number | null;
+  employerCount5y?: number | null;
   notes?: string | null;
 }) {
   return apiFetch<RenterDashboardResponse>("/api/renter/profile", {
@@ -293,6 +306,13 @@ export function shareRenterScoreReport(input: {
 export function acceptRenterScoreRequest(linkedCaseId: string) {
   return apiFetch<RenterDashboardResponse>(`/api/renter/linked-cases/${encodeURIComponent(linkedCaseId)}/accept-score-request`, {
     method: "POST"
+  });
+}
+
+export function requestLandlordReference(linkedCaseId: string, note?: string) {
+  return apiFetch<RenterDashboardResponse>(`/api/renter/linked-cases/${encodeURIComponent(linkedCaseId)}/request-landlord-reference`, {
+    method: "POST",
+    body: JSON.stringify({ note })
   });
 }
 

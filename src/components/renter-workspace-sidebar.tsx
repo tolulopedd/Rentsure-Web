@@ -1,4 +1,4 @@
-import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, UserCircle2 } from "lucide-react";
+import { ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -15,6 +15,7 @@ const items = [
   { label: "Linked Properties", to: "/account/renter/cases", icon: ClipboardList },
   { label: "Landlord Decision", to: "/account/renter/queue", icon: ListChecks },
   { label: "Payments", to: "/account/renter/payments", icon: CreditCard },
+  { label: "Your Rent Score", to: "/account/renter/buy-score", icon: ShieldCheck },
   { label: "Profile", to: "/account/renter/profile", icon: UserCircle2 }
 ];
 

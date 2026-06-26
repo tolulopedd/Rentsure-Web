@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getErrorMessage } from "@/lib/errors";
 import { listAdminLandlordAgentActivities, type AdminLandlordAgentActivityItem } from "@/lib/rent-score-api";
@@ -13,10 +15,8 @@ function formatDate(value?: string | null) {
   return date.toLocaleString();
 }
 
-function approvalBadgeClass(status: AdminLandlordAgentActivityItem["shareApproval"]["status"]) {
-  if (status === "APPROVED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === "PENDING") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-slate-200 bg-slate-50 text-slate-700";
+function activityLabel(value: string) {
+  return value.replaceAll("_", " ");
 }
 
 function approvalLabel(status: AdminLandlordAgentActivityItem["shareApproval"]["status"]) {
@@ -28,6 +28,10 @@ function approvalLabel(status: AdminLandlordAgentActivityItem["shareApproval"]["
 export default function AdminLandlordAgentActivitiesPage() {
   const [items, setItems] = useState<AdminLandlordAgentActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityType, setActivityType] = useState("ALL");
+  const [actorType, setActorType] = useState("ALL");
+  const [query, setQuery] = useState("");
+  const hasActiveFilter = query.trim().length > 0 || activityType !== "ALL" || actorType !== "ALL";
 
   async function loadItems() {
     try {
@@ -46,78 +50,121 @@ export default function AdminLandlordAgentActivitiesPage() {
     void loadItems();
   }, []);
 
+  const activityTypes = useMemo(
+    () => Array.from(new Set(items.map((item) => item.activityType))).sort(),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    if (!hasActiveFilter) return [];
+    const search = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesType = activityType === "ALL" || item.activityType === activityType;
+      const matchesActorType = actorType === "ALL" || item.actor?.accountType === actorType;
+      const matchesSearch =
+        !search ||
+        item.message.toLowerCase().includes(search) ||
+        item.renter.name.toLowerCase().includes(search) ||
+        item.renter.email.toLowerCase().includes(search) ||
+        item.property.summaryLabel.toLowerCase().includes(search) ||
+        item.property.city.toLowerCase().includes(search) ||
+        item.property.state.toLowerCase().includes(search) ||
+        item.actor?.name.toLowerCase().includes(search) ||
+        item.actor?.email.toLowerCase().includes(search);
+
+      return matchesType && matchesActorType && matchesSearch;
+    });
+  }, [activityType, actorType, hasActiveFilter, items, query]);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Landlord and agent activities</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Review property-link activity and current rent score request progress.</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin workflow</p>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Landlord and agent activities</h1>
       </div>
 
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="text-lg">Activities</CardTitle>
-          <Badge variant="outline">{items.length} items</Badge>
+          <CardTitle className="text-lg">Activity list</CardTitle>
+          {hasActiveFilter ? <Badge variant="outline">{filteredItems.length} items</Badge> : null}
         </CardHeader>
-        <CardContent>
-          {loading ? <p className="text-sm text-muted-foreground">Loading activities...</p> : null}
-          {!loading && !items.length ? <p className="text-sm text-muted-foreground">No landlord or agent activity right now.</p> : null}
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr_1fr]">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search actor, renter, property, or message"
+              className="bg-white"
+            />
+            <Select value={activityType} onValueChange={setActivityType}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="All activity types" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectItem value="ALL">All activity types</SelectItem>
+                {activityTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {activityLabel(type)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={actorType} onValueChange={setActorType}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="All actor types" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectItem value="ALL">All actor types</SelectItem>
+                <SelectItem value="LANDLORD">Landlord</SelectItem>
+                <SelectItem value="AGENT">Agent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          {!loading && items.length ? (
+          {loading ? <p className="text-sm text-muted-foreground">Loading activities...</p> : null}
+          {!loading && hasActiveFilter && !filteredItems.length ? <p className="text-sm text-muted-foreground">No activities found.</p> : null}
+
+          {!loading && filteredItems.length ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Actor</TableHead>
-                    <TableHead>Property</TableHead>
                     <TableHead>Renter</TableHead>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Score request</TableHead>
+                    <TableHead>Property</TableHead>
+                    <TableHead>Share</TableHead>
+                    <TableHead>Message</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((item) => (
+                  {filteredItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{formatDate(item.createdAt)}</TableCell>
+                      <TableCell>{activityLabel(item.activityType)}</TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-slate-950">{item.actor?.name || "-"}</div>
-                          <div className="text-xs text-muted-foreground">
+                        <div>
+                          <p className="font-medium text-slate-950">{item.actor?.name || "-"}</p>
+                          <p className="text-xs text-muted-foreground">
                             {item.actor?.accountType || "-"}{item.actor?.email ? ` · ${item.actor.email}` : ""}
-                          </div>
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div>{item.property.summaryLabel}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {item.property.city}, {item.property.state}
-                          </div>
+                        <div>
+                          <p className="font-medium text-slate-950">{item.renter.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.renter.email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-slate-950">{item.renter.name}</div>
-                          <div className="text-xs text-muted-foreground">{item.renter.email}</div>
+                        <div>
+                          <p className="font-medium text-slate-950">{item.property.summaryLabel}</p>
+                          <p className="text-xs text-muted-foreground">{item.property.city}, {item.property.state}</p>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div>{item.message}</div>
-                          <div className="text-xs uppercase tracking-[0.14em] text-muted-foreground">{item.activityType.replaceAll("_", " ")}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          <Badge className={approvalBadgeClass(item.shareApproval.status)}>{approvalLabel(item.shareApproval.status)}</Badge>
-                          {item.latestScoreRequest ? (
-                            <div className="text-xs text-muted-foreground">
-                              Request {formatDate(item.latestScoreRequest.createdAt)}
-                              {item.latestScoreRequest.reviewedAt ? ` · Reviewed ${formatDate(item.latestScoreRequest.reviewedAt)}` : ""}
-                            </div>
-                          ) : null}
-                        </div>
-                      </TableCell>
+                      <TableCell>{approvalLabel(item.shareApproval.status)}</TableCell>
+                      <TableCell className="min-w-[260px]">{item.message}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

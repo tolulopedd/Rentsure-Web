@@ -8,6 +8,7 @@ import { getRenterOnboarding } from "@/lib/onboarding";
 import {
   decisionBadgeClass,
   formatDate,
+  rentScoreBandLabel,
   scoreBandBadgeClass
 } from "@/lib/renter-workspace-presenters";
 
@@ -17,7 +18,6 @@ export default function RenterWorkspaceDashboard() {
   if (!data) return null;
 
   const onboarding = getRenterOnboarding(data.profile);
-
   return (
     <div className="space-y-4 md:space-y-6">
       {!onboarding.isComplete ? (
@@ -40,35 +40,11 @@ export default function RenterWorkspaceDashboard() {
         </Card>
       ) : null}
 
-      {data.notifications.length ? (
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Notifications</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {data.notifications.slice(0, 3).map((notification) => (
-              <div key={notification.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-950">{notification.title}</p>
-                    <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.createdAt)}</p>
-                  </div>
-                  {notification.ctaPath ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link to={notification.ctaPath}>{notification.ctaLabel || "Open"}</Link>
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
-
       <div className="grid gap-4 xl:grid-cols-[1.3fr_0.95fr] xl:gap-6">
         <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.18),_transparent_34%),linear-gradient(135deg,#ffffff,#f3f8ff_62%,#edf4ff)] p-4 shadow-sm md:rounded-[30px] md:p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--rentsure-blue)]">Dashboard</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--rentsure-blue)]">Dashboard</p>
+          </div>
           <div className="mt-3 flex flex-col gap-3 lg:mt-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <h1 className="text-xl font-bold tracking-tight text-slate-950 sm:text-2xl md:text-3xl">Your current rent score</h1>
@@ -78,7 +54,7 @@ export default function RenterWorkspaceDashboard() {
                   <span className="ml-2 text-xl font-medium text-slate-400 sm:text-2xl">/ {data.rentScore.summary.maxScore}</span>
                 </div>
                 <Badge className={`sm:hidden ${scoreBandBadgeClass(data.rentScore.summary.scoreBand)}`}>
-                  {data.rentScore.summary.scoreBand}
+                  {rentScoreBandLabel(data.rentScore.summary.scoreBand)}
                 </Badge>
               </div>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
@@ -88,7 +64,7 @@ export default function RenterWorkspaceDashboard() {
             <div className="hidden self-start rounded-3xl border border-white/80 bg-white/80 px-4 py-3 text-left backdrop-blur sm:block sm:px-5 sm:py-4 sm:text-right">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Band</p>
               <Badge className={`mt-2 ${scoreBandBadgeClass(data.rentScore.summary.scoreBand)}`}>
-                {data.rentScore.summary.scoreBand}
+                {rentScoreBandLabel(data.rentScore.summary.scoreBand)}
               </Badge>
             </div>
           </div>
@@ -126,6 +102,9 @@ export default function RenterWorkspaceDashboard() {
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:flex xl:flex-wrap">
               <Button asChild variant="outline" className="w-full xl:w-auto">
                 <Link to="/account/renter/payments">Confirm payments</Link>
+              </Button>
+              <Button asChild className="w-full bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)] xl:w-auto">
+                <Link to="/account/renter/buy-score">Your rent score</Link>
               </Button>
             </div>
           </div>
@@ -257,7 +236,7 @@ export default function RenterWorkspaceDashboard() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <Badge className={scoreBandBadgeClass(share.scoreBand)}>{share.scoreBand}</Badge>
+                  <Badge className={scoreBandBadgeClass(share.scoreBand)}>{rentScoreBandLabel(share.scoreBand)}</Badge>
                 </div>
               </div>
             ))}

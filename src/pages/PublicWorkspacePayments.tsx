@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
@@ -60,6 +61,10 @@ export default function PublicWorkspacePayments() {
   const [approvedQueue, setApprovedQueue] = useState<QueueListItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
+  const [scheduleDateFilter, setScheduleDateFilter] = useState("");
+  const [scheduleAmountFilter, setScheduleAmountFilter] = useState("");
+  const [scheduleStatusFilter, setScheduleStatusFilter] = useState("ALL");
+  const [scheduleTimingFilter, setScheduleTimingFilter] = useState("ALL");
   const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(emptyScheduleDraft);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,7 +81,7 @@ export default function PublicWorkspacePayments() {
       const resolvedId =
         nextSelectedId && approvedItems.some((item) => item.id === nextSelectedId)
           ? nextSelectedId
-          : approvedItems[0]?.id || "";
+          : "";
       setSelectedId(resolvedId);
     } catch (error: unknown) {
       if (!input?.silent) {
@@ -121,15 +126,18 @@ export default function PublicWorkspacePayments() {
 
   useEffect(() => {
     setShowScheduleForm(false);
+    setScheduleDateFilter("");
+    setScheduleAmountFilter("");
+    setScheduleStatusFilter("ALL");
+    setScheduleTimingFilter("ALL");
   }, [selectedId]);
 
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
       await loadQueue(currentSelectedId, { silent: true });
-      const fallbackSelectedId = currentSelectedId || approvedQueue[0]?.id || "";
-      if (fallbackSelectedId) {
-        await loadDetail(fallbackSelectedId, { silent: true });
+      if (currentSelectedId) {
+        await loadDetail(currentSelectedId, { silent: true });
       }
     },
     {
@@ -141,7 +149,7 @@ export default function PublicWorkspacePayments() {
   async function addSchedule() {
     if (!detail) return;
     try {
-      const response = await createWorkspacePaymentSchedule(detail.id, {
+      await createWorkspacePaymentSchedule(detail.id, {
         paymentType: scheduleDraft.paymentType,
         amountNgn: Number(scheduleDraft.amountNgn),
         dueDate: scheduleDraft.dueDate,
@@ -154,10 +162,10 @@ export default function PublicWorkspacePayments() {
             }
           : undefined
       });
-      setDetail(response);
       setScheduleDraft(emptyScheduleDraft);
       setShowScheduleForm(false);
       await loadQueue(detail.id);
+      await loadDetail(detail.id);
       toast.success("Payment schedule logged");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to add payment schedule"));
@@ -167,14 +175,30 @@ export default function PublicWorkspacePayments() {
   async function confirmSchedule(paymentScheduleId: string) {
     if (!detail) return;
     try {
-      const response = await confirmWorkspacePaymentSchedule(paymentScheduleId);
-      setDetail(response);
+      await confirmWorkspacePaymentSchedule(paymentScheduleId);
       await loadQueue(detail.id);
+      await loadDetail(detail.id);
       toast.success("Payment confirmed");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to confirm payment"));
     }
   }
+
+  const filteredSchedules = useMemo(() => {
+    if (!detail) return [];
+
+    return detail.paymentSchedules.filter((schedule) => {
+      const dueDate = schedule.dueDate ? schedule.dueDate.slice(0, 10) : "";
+      const amountText = String(schedule.amountNgn);
+      const statusMatches = scheduleStatusFilter === "ALL" || schedule.status === scheduleStatusFilter;
+      const timingValue = schedule.confirmationTiming || "UNCONFIRMED";
+      const timingMatches = scheduleTimingFilter === "ALL" || timingValue === scheduleTimingFilter;
+      const dateMatches = !scheduleDateFilter || dueDate === scheduleDateFilter;
+      const amountMatches = !scheduleAmountFilter || amountText.includes(scheduleAmountFilter.trim());
+
+      return statusMatches && timingMatches && dateMatches && amountMatches;
+    });
+  }, [detail, scheduleAmountFilter, scheduleDateFilter, scheduleStatusFilter, scheduleTimingFilter]);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -198,55 +222,41 @@ export default function PublicWorkspacePayments() {
         </Button>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.4fr] xl:gap-6">
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Tenants</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? <p className="text-sm text-muted-foreground">Loading payment cases...</p> : null}
-            {!loading && !approvedQueue.length ? <p className="text-sm text-muted-foreground">No approved renters are available for payment scheduling yet.</p> : null}
-            {approvedQueue.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
-                  selectedId === item.id
-                    ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                }`}
-              >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-950">{renterName(item)}</p>
-                    <p className="text-sm text-slate-600">{propertyDisplayName(item.property)}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-                      <span>{propertyUnitDisplayName(item.propertyUnit)}</span>
-                      {item.propertyUnit ? (
-                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
-                          {occupancyLabel(item.propertyUnit.isOccupied)}
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{item.property.address}</p>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant="outline">{item.paymentSchedules.length} schedule{item.paymentSchedules.length === 1 ? "" : "s"}</Badge>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Tenants</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loading ? <p className="text-sm text-muted-foreground">Loading payment cases...</p> : null}
+          {!loading && !approvedQueue.length ? <p className="text-sm text-muted-foreground">No approved renters are available for payment scheduling yet.</p> : null}
+          {!loading && approvedQueue.length ? (
+            <div className="space-y-2">
+              <Label>Tenant</Label>
+              <Select value={selectedId} onValueChange={setSelectedId}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select tenant" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {approvedQueue.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
-        <Card className="border-slate-200 shadow-sm">
+      <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Payment schedules</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
             {detailLoading ? <p className="text-sm text-muted-foreground">Loading payment detail...</p> : null}
-            {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a renter case to manage payments.</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a tenant to manage payments.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading payment detail...</p> : null}
             {detail ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
@@ -381,75 +391,120 @@ export default function PublicWorkspacePayments() {
 
                 <div className="space-y-3">
                   <p className="text-sm font-semibold text-slate-950">Payment requests</p>
-                  {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules logged yet.</p> : null}
-                  {detail.paymentSchedules.map((schedule) => (
-                    <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
-                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                        <div className="space-y-2">
-                          <p className="font-semibold text-slate-950">{schedule.paymentType.replaceAll("_", " ")}</p>
-                          {schedule.note ? <p className="text-sm text-slate-600">{schedule.note}</p> : null}
-                          <p className="text-xs text-slate-500">Requested by {schedule.createdBy.name}</p>
-                        </div>
-                        <div className="space-y-2 text-sm text-slate-600">
-                          <SummaryRow label="Amount" value={formatNgn(schedule.amountNgn)} />
-                          <SummaryRow label="Due" value={formatDate(schedule.dueDate)} />
-                          <SummaryRow label="Status" value={schedule.status} />
-                          <SummaryRow
-                            label="Timing"
-                            value={schedule.confirmationTiming ? (schedule.confirmationTiming === "ON_TIME" ? "On time" : "Late") : "-"}
-                          />
-                        </div>
-                      </div>
-                      {schedule.paymentEvidenceFileName ? (
-                        <p className="mt-3 text-xs text-slate-500">Evidence: {schedule.paymentEvidenceFileName}</p>
-                      ) : null}
-                      {schedule.confirmationInitiatedAt ? (
-                        <p className="mt-1 text-xs text-amber-700">Renter sent proof on {formatDate(schedule.confirmationInitiatedAt)}.</p>
-                      ) : (
-                        <p className="mt-1 text-xs text-slate-500">Awaiting renter proof of payment.</p>
-                      )}
-                      {schedule.receiptReference ? (
-                        <p className="mt-1 text-xs text-slate-500">Receipt reference: {schedule.receiptReference}</p>
-                      ) : null}
-                      {schedule.confirmationInitiatedBy ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Initiated by {schedule.confirmationInitiatedBy.name} ({schedule.confirmationInitiatedBy.accountType.toLowerCase()})
-                        </p>
-                      ) : null}
-                      <div className="mt-4 flex items-center gap-3">
-                        {schedule.paymentEvidenceViewUrl ? (
-                          <Button asChild size="sm" variant="outline">
-                            <a href={schedule.paymentEvidenceViewUrl} target="_blank" rel="noreferrer">
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              View proof
-                            </a>
-                          </Button>
-                        ) : null}
-                        {schedule.status !== "PAID" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void confirmSchedule(schedule.id)}
-                            disabled={!schedule.confirmationInitiatedAt}
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Confirm payment
-                          </Button>
-                        ) : (
-                          <div className="flex items-center gap-2 text-sm text-emerald-700">
-                            <Clock3 className="h-4 w-4" />
-                            Paid {formatDate(schedule.paidAt)}
-                          </div>
-                        )}
-                      </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label>Due date</Label>
+                      <Input type="date" value={scheduleDateFilter} onChange={(event) => setScheduleDateFilter(event.target.value)} className="bg-white" />
                     </div>
-                  ))}
+                    <div className="space-y-2">
+                      <Label>Amount</Label>
+                      <Input
+                        value={scheduleAmountFilter}
+                        onChange={(event) => setScheduleAmountFilter(event.target.value)}
+                        placeholder="Search amount"
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select value={scheduleStatusFilter} onValueChange={setScheduleStatusFilter}>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="ALL">All statuses</SelectItem>
+                          <SelectItem value="PENDING">Pending</SelectItem>
+                          <SelectItem value="PAID">Paid</SelectItem>
+                          <SelectItem value="OVERDUE">Overdue</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Timing</Label>
+                      <Select value={scheduleTimingFilter} onValueChange={setScheduleTimingFilter}>
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="All timing" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white">
+                          <SelectItem value="ALL">All timing</SelectItem>
+                          <SelectItem value="UNCONFIRMED">Awaiting proof</SelectItem>
+                          <SelectItem value="ON_TIME">On time</SelectItem>
+                          <SelectItem value="LATE">Late</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules logged yet.</p> : null}
+                  {detail.paymentSchedules.length && !filteredSchedules.length ? (
+                    <p className="text-sm text-muted-foreground">No payment schedules match the current filters.</p>
+                  ) : null}
+
+                  {filteredSchedules.length ? (
+                    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Due date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Timing</TableHead>
+                            <TableHead>Proof</TableHead>
+                            <TableHead>Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredSchedules.map((schedule) => (
+                            <TableRow key={schedule.id}>
+                              <TableCell className="font-medium text-slate-950">{schedule.paymentType.replaceAll("_", " ")}</TableCell>
+                              <TableCell>{formatNgn(schedule.amountNgn)}</TableCell>
+                              <TableCell>{formatDate(schedule.dueDate)}</TableCell>
+                              <TableCell>{schedule.status}</TableCell>
+                              <TableCell>
+                                {schedule.confirmationTiming ? (schedule.confirmationTiming === "ON_TIME" ? "On time" : "Late") : "Awaiting proof"}
+                              </TableCell>
+                              <TableCell>
+                                {schedule.paymentEvidenceViewUrl ? (
+                                  <Button asChild size="sm" variant="outline">
+                                    <a href={schedule.paymentEvidenceViewUrl} target="_blank" rel="noreferrer">
+                                      <ExternalLink className="mr-2 h-4 w-4" />
+                                      View proof
+                                    </a>
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-slate-500">No proof</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {schedule.status !== "PAID" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void confirmSchedule(schedule.id)}
+                                    disabled={!schedule.confirmationInitiatedAt}
+                                  >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Confirm
+                                  </Button>
+                                ) : (
+                                  <div className="flex items-center gap-2 text-sm text-emerald-700">
+                                    <Clock3 className="h-4 w-4" />
+                                    Paid
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

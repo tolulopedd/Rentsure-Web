@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { MapboxAddressFields } from "@/components/MapboxAddressFields";
 import { PassportPhotoCard } from "@/components/PassportPhotoCard";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import { getErrorMessage } from "@/lib/errors";
 import { formatDate } from "@/lib/renter-workspace-presenters";
@@ -29,6 +30,8 @@ export default function RenterWorkspaceProfile() {
     state: "",
     city: "",
     address: "",
+    residenceMoveCount5y: "",
+    employerCount5y: "",
     notes: ""
   });
   const [nin, setNin] = useState("");
@@ -55,6 +58,8 @@ export default function RenterWorkspaceProfile() {
       state: data.profile.state || "",
       city: data.profile.city || "",
       address: data.profile.address || "",
+      residenceMoveCount5y: data.profile.residenceMoveCount5y == null ? "" : String(Math.min(5, data.profile.residenceMoveCount5y)),
+      employerCount5y: data.profile.employerCount5y == null ? "" : String(Math.min(5, data.profile.employerCount5y)),
       notes: data.profile.notes || ""
     });
     setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
@@ -86,6 +91,8 @@ export default function RenterWorkspaceProfile() {
       state: profileDraft.state,
       city: profileDraft.city,
       address: profileDraft.address,
+      residenceMoveCount5y: profileDraft.residenceMoveCount5y ? Number(profileDraft.residenceMoveCount5y) : null,
+      employerCount5y: profileDraft.employerCount5y ? Number(profileDraft.employerCount5y) : null,
       notes: profileDraft.notes || null
     });
     if (success) {
@@ -259,6 +266,40 @@ export default function RenterWorkspaceProfile() {
                 setProfileDraft((current) => ({ ...current, address: value }));
               }}
             />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Moves in last 5 years"
+                value={profileDraft.residenceMoveCount5y}
+                placeholder="Select movement count"
+                options={[
+                  { value: "1", label: "1 move" },
+                  { value: "2", label: "2 moves" },
+                  { value: "3", label: "3 moves" },
+                  { value: "4", label: "4 moves" },
+                  { value: "5", label: "5 moves" }
+                ]}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, residenceMoveCount5y: value }));
+                }}
+              />
+              <SelectField
+                label="Employers in last 5 years"
+                value={profileDraft.employerCount5y}
+                placeholder="Select employer count"
+                options={[
+                  { value: "1", label: "1 employer" },
+                  { value: "2", label: "2 employers" },
+                  { value: "3", label: "3 employers" },
+                  { value: "4", label: "4 employers" },
+                  { value: "5", label: "5+ employers" }
+                ]}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, employerCount5y: value }));
+                }}
+              />
+            </div>
             <div className="space-y-2">
               <Label>Additional information</Label>
               <Textarea
@@ -357,6 +398,38 @@ function Field({
         className={`bg-white ${errorMessage ? "border-rose-300 focus-visible:ring-rose-200" : ""}`}
       />
       {errorMessage ? <p className="text-xs text-rose-600">{errorMessage}</p> : helperText ? <p className="text-xs text-slate-500">{helperText}</p> : null}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="bg-white">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent className="bg-white">
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

@@ -59,7 +59,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
 
         <div className="flex items-center gap-3">
           <div className="hidden flex-col items-end px-2 md:flex">
-            <span className="text-sm text-muted-foreground">Lagos Time</span>
+            <span className="text-sm text-muted-foreground">Nigerian Time</span>
             <span className="text-xs font-medium leading-tight text-[var(--rentsure-blue)]">{ngTime}</span>
           </div>
 

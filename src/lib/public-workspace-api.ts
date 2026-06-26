@@ -38,6 +38,7 @@ export type WorkspaceProperty = {
     state: string;
     bedroomCount: number;
     bathroomCount: number;
+    annualRentAmountNgn?: number | null;
     isOccupied: boolean;
     currentTenantName?: string | null;
     currentTenantEmail?: string | null;
@@ -254,6 +255,24 @@ export type QueueDetail = {
       email: string;
     } | null;
   }>;
+  landlordReferenceRequests: Array<{
+    id: string;
+    status: "PENDING" | "COMPLETED" | "DECLINED";
+    recommendation?: "STRONGLY_RECOMMEND" | "RECOMMEND" | "NEUTRAL" | "DO_NOT_RECOMMEND" | null;
+    note?: string | null;
+    requestedAt: string;
+    respondedAt?: string | null;
+    renter: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    landlord: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  }>;
   latestRentScorePayment: {
     id: string;
     provider: RentScorePaymentProvider;
@@ -430,6 +449,7 @@ export function createWorkspaceProperty(input: {
     label: string;
     bedroomCount: number;
     bathroomCount: number;
+    annualRentAmountNgn?: number | null;
     isOccupied: boolean;
     currentTenantName?: string;
     currentTenantEmail?: string;
@@ -458,6 +478,7 @@ export function updateWorkspaceProperty(
       label: string;
       bedroomCount: number;
       bathroomCount: number;
+      annualRentAmountNgn?: number | null;
       isOccupied: boolean;
       currentTenantName?: string;
       currentTenantEmail?: string;
@@ -586,6 +607,35 @@ export function commentOnWorkspaceProposedRenter(proposedRenterId: string, messa
   return apiFetch<QueueDetail>(`/api/workspace/queue/${encodeURIComponent(proposedRenterId)}/comments`, {
     method: "POST",
     body: JSON.stringify({ message })
+  });
+}
+
+export function submitWorkspaceRenterBehaviourReview(
+  proposedRenterId: string,
+  input: {
+    rating: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
+    damagesReported?: boolean;
+    note?: string;
+    complaints?: string[];
+  }
+) {
+  return apiFetch<QueueDetail>(`/api/workspace/queue/${encodeURIComponent(proposedRenterId)}/behaviour-review`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function respondToLandlordReferenceRequest(
+  requestId: string,
+  input: {
+    recommendation: "STRONGLY_RECOMMEND" | "RECOMMEND" | "NEUTRAL" | "DO_NOT_RECOMMEND";
+    note?: string;
+    decline?: boolean;
+  }
+) {
+  return apiFetch<QueueDetail>(`/api/workspace/landlord-reference-requests/${encodeURIComponent(requestId)}/respond`, {
+    method: "POST",
+    body: JSON.stringify(input)
   });
 }
 

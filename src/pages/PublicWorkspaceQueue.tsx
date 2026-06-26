@@ -12,11 +12,13 @@ import { getErrorMessage } from "@/lib/errors";
 import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   createWorkspaceProposedRenter,
+  respondToLandlordReferenceRequest,
   getWorkspaceQueueItem,
   listWorkspaceProperties,
   listWorkspaceQueue,
   requestWorkspaceRentScore,
   searchWorkspaceRenters,
+  submitWorkspaceRenterBehaviourReview,
   type QueueDetail,
   type QueueListItem,
   type WorkspaceRenterSearchResult,
@@ -34,6 +36,14 @@ function formatDate(value?: string | null) {
 function renterName(item: { firstName: string; lastName: string; organizationName?: string | null }) {
   return item.organizationName || [item.firstName, item.lastName].filter(Boolean).join(" ");
 }
+
+type BehaviourRating = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
+type ReferenceRecommendation = "STRONGLY_RECOMMEND" | "RECOMMEND" | "NEUTRAL" | "DO_NOT_RECOMMEND";
+
+type ReferenceDraft = {
+  recommendation: ReferenceRecommendation;
+  note: string;
+};
 
 type ProposedDraft = {
   propertyId: string;
@@ -74,6 +84,10 @@ export default function PublicWorkspaceQueue() {
   const [searchResults, setSearchResults] = useState<WorkspaceRenterSearchResult[]>([]);
   const [selectedExistingRenter, setSelectedExistingRenter] = useState<WorkspaceRenterSearchResult | null>(null);
   const [invitePreviewUrl, setInvitePreviewUrl] = useState<string | null>(null);
+  const [behaviourRating, setBehaviourRating] = useState<BehaviourRating>("GOOD");
+  const [damagesReported, setDamagesReported] = useState(false);
+  const [behaviourNote, setBehaviourNote] = useState("");
+  const [referenceDrafts, setReferenceDrafts] = useState<Record<string, ReferenceDraft>>({});
   const isAgent = (localStorage.getItem("userRole") || "").toUpperCase() === "AGENT";
 
   const loadQueue = useCallback(async (nextSelectedId?: string, input?: { silent?: boolean }) => {
@@ -96,7 +110,7 @@ export default function PublicWorkspaceQueue() {
       const resolvedId =
         nextSelectedId && queueResponse.items.some((item) => item.id === nextSelectedId)
           ? nextSelectedId
-          : queueResponse.items[0]?.id || "";
+          : "";
       setSelectedId(resolvedId);
     } catch (error: unknown) {
       if (!input?.silent) {
@@ -139,13 +153,32 @@ export default function PublicWorkspaceQueue() {
     void loadDetail(selectedId);
   }, [loadDetail, selectedId]);
 
+  useEffect(() => {
+    if (!detail) return;
+
+    const nextBehaviourRating = getBehaviourRatingFromDetail(detail);
+    setBehaviourRating(nextBehaviourRating || "GOOD");
+    setDamagesReported(hasDamagesReported(detail));
+    setBehaviourNote("");
+
+    setReferenceDrafts((current) => {
+      const next: Record<string, ReferenceDraft> = {};
+      detail.landlordReferenceRequests.forEach((request) => {
+        next[request.id] = current[request.id] || {
+          recommendation: (request.recommendation || "RECOMMEND") as ReferenceRecommendation,
+          note: request.status === "PENDING" ? "" : request.note || ""
+        };
+      });
+      return next;
+    });
+  }, [detail]);
+
   useAutoRefresh(
     async () => {
       const currentSelectedId = selectedId;
       await loadQueue(currentSelectedId, { silent: true });
-      const fallbackSelectedId = currentSelectedId || queue[0]?.id || "";
-      if (fallbackSelectedId) {
-        await loadDetail(fallbackSelectedId, { silent: true });
+      if (currentSelectedId) {
+        await loadDetail(currentSelectedId, { silent: true });
       }
     },
     {
@@ -279,7 +312,7 @@ export default function PublicWorkspaceQueue() {
       setInvitePreviewUrl(response.invitePreviewUrl || null);
       resetSearchFlow(draft.propertyId);
       await loadQueue(response.id);
-      setDetail(response);
+      await loadDetail(response.id);
       setShowLinkForm(false);
       toast.success(
         isExistingMember
@@ -294,18 +327,53 @@ export default function PublicWorkspaceQueue() {
   async function requestRentScore() {
     if (!detail) return;
     try {
-      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
-      await loadDetail(detail.id);
+      await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadQueue(detail.id);
-      setDetail(response);
+      await loadDetail(detail.id);
       toast.success("Rent score requested.");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to request rent score"));
     }
   }
 
+  async function submitBehaviourReview() {
+    if (!detail) return;
+    try {
+      await submitWorkspaceRenterBehaviourReview(detail.id, {
+        rating: behaviourRating,
+        damagesReported,
+        note: behaviourNote || undefined
+      });
+      await loadQueue(detail.id);
+      await loadDetail(detail.id);
+      toast.success("Renter behaviour review submitted.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to submit renter behaviour review"));
+    }
+  }
+
+  async function submitReferenceResponse(requestId: string, input?: { decline?: boolean }) {
+    const draft = referenceDrafts[requestId] || {
+      recommendation: "RECOMMEND" as ReferenceRecommendation,
+      note: ""
+    };
+    try {
+      await respondToLandlordReferenceRequest(requestId, {
+        recommendation: draft.recommendation,
+        note: draft.note || undefined,
+        decline: input?.decline
+      });
+      await loadQueue(detail?.id);
+      await loadDetail(detail?.id || "");
+      toast.success(input?.decline ? "Landlord reference request declined." : "Landlord reference submitted.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, input?.decline ? "Failed to decline landlord reference" : "Failed to submit landlord reference"));
+    }
+  }
+
   const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
   const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
+  const isApprovedTenant = detail?.decision?.decision === "APPROVED";
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -478,67 +546,46 @@ export default function PublicWorkspaceQueue() {
       ) : null}
 
       <div className="space-y-4 md:space-y-6">
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Linked tenants</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading ? <p className="text-sm text-muted-foreground">Loading queue...</p> : null}
-              {!loading && !properties.length ? (
-                <p className="text-sm text-muted-foreground">No property attached to this profile yet.</p>
-              ) : null}
-              {!loading && properties.length && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters in the queue yet.</p> : null}
-              {queue.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                    selectedId === item.id
-                      ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                      : "border-slate-200 bg-white hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                      <p className="truncate font-semibold text-slate-950">{propertyDisplayName(item.property)}</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <p className="truncate font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
-                        {item.propertyUnit ? (
-                          <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
-                            {occupancyLabel(item.propertyUnit.isOccupied)}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
-                      <p className="truncate font-semibold text-slate-950">{renterName(item)}</p>
-                    </div>
-                    <div className="sm:justify-self-end">
-                      <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
-                        {item.decision?.decision || item.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Linked tenants</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loading ? <p className="text-sm text-muted-foreground">Loading queue...</p> : null}
+            {!loading && !properties.length ? (
+              <p className="text-sm text-muted-foreground">No property attached to this profile yet.</p>
+            ) : null}
+            {!loading && properties.length && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters in the queue yet.</p> : null}
+            {!loading && queue.length ? (
+              <div className="space-y-2">
+                <Label>Linked tenant</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select linked tenant" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {queue.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Property-tenant details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 md:space-y-5">
-              {detailLoading ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
-              {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to manage their record.</p> : null}
-              {detail ? (
-                <>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Property-tenant details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 md:space-y-5">
+            {detailLoading ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant to manage their record.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
+            {detail ? (
+              <>
                   <div className="rounded-2xl border border-slate-200 bg-white">
                     <div className="border-b border-slate-200 px-4 py-3">
                       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -608,27 +655,139 @@ export default function PublicWorkspaceQueue() {
                     </Button>
                   </div>
 
-                  <div className="space-y-3">
-                    <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
-                    {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
-                    {detail.scoreRequests.map((request) => (
-                      <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <Badge variant="outline">{request.status}</Badge>
-                          <span className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</span>
+                  {!isAgent && isApprovedTenant ? (
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <Card className="border-slate-200 shadow-none">
+                        <CardHeader className="px-0 pt-0">
+                          <CardTitle className="text-base">Renter behaviour review</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 px-0 pb-0">
+                          <div className="space-y-2">
+                            <Label>Behaviour rating</Label>
+                            <Select value={behaviourRating} onValueChange={(value) => setBehaviourRating(value as typeof behaviourRating)}>
+                              <SelectTrigger className="bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white">
+                                <SelectItem value="EXCELLENT">Excellent</SelectItem>
+                                <SelectItem value="GOOD">Good</SelectItem>
+                                <SelectItem value="FAIR">Fair</SelectItem>
+                                <SelectItem value="POOR">Poor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input type="checkbox" checked={damagesReported} onChange={(event) => setDamagesReported(event.target.checked)} />
+                            Damages or serious misuse reported
+                          </label>
+                          <div className="space-y-2">
+                            <Label>Review note</Label>
+                            <Textarea value={behaviourNote} onChange={(event) => setBehaviourNote(event.target.value)} className="bg-white" />
+                          </div>
+                          <Button variant="outline" onClick={() => void submitBehaviourReview()}>
+                            Save behaviour review
+                          </Button>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-slate-200 shadow-none">
+                        <CardHeader className="px-0 pt-0">
+                          <CardTitle className="text-base">Landlord reference requests</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 px-0 pb-0">
+                          {!detail.landlordReferenceRequests.length ? (
+                            <p className="text-sm text-muted-foreground">No landlord reference requests yet for this renter.</p>
+                          ) : null}
+                          {detail.landlordReferenceRequests.map((request) => (
+                            <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-slate-950">{request.renter.name}</p>
+                                  <p className="text-sm text-slate-600">{request.status.replaceAll("_", " ")}</p>
+                                  {request.note ? <p className="text-sm text-slate-500">{request.note}</p> : null}
+                                  {request.recommendation ? <p className="text-sm text-slate-600">Response: {request.recommendation.replaceAll("_", " ")}</p> : null}
+                                  {request.respondedAt ? <p className="text-xs text-muted-foreground">Responded {formatDate(request.respondedAt)}</p> : null}
+                                </div>
+                                <span className="text-xs text-muted-foreground">{formatDate(request.requestedAt)}</span>
+                              </div>
+                              {request.status === "PENDING" ? (
+                                <div className="mt-3 space-y-3">
+                                  <Select
+                                    value={referenceDrafts[request.id]?.recommendation || "RECOMMEND"}
+                                    onValueChange={(value) =>
+                                      setReferenceDrafts((current) => ({
+                                        ...current,
+                                        [request.id]: {
+                                          recommendation: value as ReferenceRecommendation,
+                                          note: current[request.id]?.note || ""
+                                        }
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="bg-white">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white">
+                                      <SelectItem value="STRONGLY_RECOMMEND">Strongly recommend</SelectItem>
+                                      <SelectItem value="RECOMMEND">Recommend</SelectItem>
+                                      <SelectItem value="NEUTRAL">Neutral</SelectItem>
+                                      <SelectItem value="DO_NOT_RECOMMEND">Do not recommend</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Textarea
+                                    value={referenceDrafts[request.id]?.note || ""}
+                                    onChange={(event) =>
+                                      setReferenceDrafts((current) => ({
+                                        ...current,
+                                        [request.id]: {
+                                          recommendation: current[request.id]?.recommendation || "RECOMMEND",
+                                          note: event.target.value
+                                        }
+                                      }))
+                                    }
+                                    className="bg-white"
+                                    placeholder="Add reference note"
+                                  />
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button variant="outline" onClick={() => void submitReferenceResponse(request.id)}>
+                                      Submit reference
+                                    </Button>
+                                    <Button variant="ghost" onClick={() => void submitReferenceResponse(request.id, { decline: true })}>
+                                      Decline request
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ) : null}
+
+                  {isApprovedTenant ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
+                      {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
+                      {detail.scoreRequests.map((request) => (
+                        <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <Badge variant="outline">{request.status}</Badge>
+                            <span className="text-xs text-muted-foreground">{formatDate(request.createdAt)}</span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-sm text-slate-600">
+                            <p>Requested by {request.requestedBy.name}</p>
+                            {request.forwardedTo ? <p>Forwarded to {request.forwardedTo.name}</p> : null}
+                            {request.notes ? <p>{request.notes}</p> : null}
+                          </div>
                         </div>
-                        <div className="mt-2 space-y-1 text-sm text-slate-600">
-                          <p>Requested by {request.requestedBy.name}</p>
-                          {request.forwardedTo ? <p>Forwarded to {request.forwardedTo.name}</p> : null}
-                          {request.notes ? <p>{request.notes}</p> : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </CardContent>
-          </Card>
+                      ))}
+                    </div>
+                  ) : null}
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -658,4 +817,17 @@ function decisionBadgeClass(decision?: string | null) {
   if (decision === "HOLD") return "border-amber-200 bg-amber-50 text-amber-700";
   if (decision === "DECLINED") return "border-rose-200 bg-rose-50 text-rose-700";
   return "border-slate-200 bg-slate-50 text-slate-700";
+}
+
+function getBehaviourRatingFromDetail(detail: QueueDetail): BehaviourRating | null {
+  const codes = detail.linkedRentScoreReport?.breakdown || [];
+  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_EXCELLENT" && item.quantity > 0)) return "EXCELLENT";
+  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_GOOD" && item.quantity > 0)) return "GOOD";
+  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_FAIR" && item.quantity > 0)) return "FAIR";
+  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_POOR" && item.quantity > 0)) return "POOR";
+  return null;
+}
+
+function hasDamagesReported(detail: QueueDetail) {
+  return (detail.linkedRentScoreReport?.breakdown || []).some((item) => item.code === "DAMAGES_REPORTED" && item.quantity > 0);
 }

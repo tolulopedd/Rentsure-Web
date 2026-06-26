@@ -6,6 +6,7 @@ import {
   confirmRenterPayment,
   getRenterDashboard,
   initiateRenterPaymentConfirmation,
+  requestLandlordReference as requestLandlordReferenceApi,
   saveRenterPassportPhoto,
   shareRenterScoreReport,
   updateRenterProfile,
@@ -33,6 +34,8 @@ type RenterWorkspaceContextValue = {
     state?: string;
     city?: string;
     address?: string;
+    residenceMoveCount5y?: number | null;
+    employerCount5y?: number | null;
     notes?: string | null;
   }) => Promise<boolean>;
   verifyIdentityValue: (input: {
@@ -76,6 +79,7 @@ type RenterWorkspaceContextValue = {
     note?: string;
   }) => Promise<{ success: boolean; previewUrl?: string | null }>;
   acceptScoreRequest: (linkedCaseId: string) => Promise<boolean>;
+  requestLandlordReference: (linkedCaseId: string, note?: string) => Promise<boolean>;
   savePassportPhoto: (input: {
     objectKey: string;
     fileName: string;
@@ -152,6 +156,8 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     state?: string;
     city?: string;
     address?: string;
+    residenceMoveCount5y?: number | null;
+    employerCount5y?: number | null;
     notes?: string | null;
   }) {
     try {
@@ -288,6 +294,18 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function requestLandlordReference(linkedCaseId: string, note?: string) {
+    try {
+      const response = await requestLandlordReferenceApi(linkedCaseId, note);
+      setData(response);
+      toast.success("Landlord reference requested");
+      return true;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to request landlord reference"));
+      return false;
+    }
+  }
+
   async function savePassportPhoto(input: {
     objectKey: string;
     fileName: string;
@@ -322,6 +340,7 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
         initiateDirectPayment,
         shareScoreReport,
         acceptScoreRequest,
+        requestLandlordReference,
         savePassportPhoto
       }}
     >

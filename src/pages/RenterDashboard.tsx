@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { NigeriaAddressFields } from "@/components/NigeriaAddressFields";
 import { clearAuthSession } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
+import { rentScoreBandLabel } from "@/lib/rent-score-band";
 import {
   confirmRenterPayment,
   getRenterDashboard,
@@ -228,7 +229,7 @@ export default function RenterDashboard() {
               <div className="rounded-3xl border border-white/80 bg-white/80 px-5 py-4 text-right backdrop-blur">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Band</p>
                 <Badge className={`mt-2 ${scoreBandBadgeClass(data.rentScore.summary.scoreBand)}`}>
-                  {data.rentScore.summary.scoreBand}
+                  {rentScoreBandLabel(data.rentScore.summary.scoreBand)}
                 </Badge>
                 <p className="mt-2 text-xs text-slate-500">
                   +{data.rentScore.summary.positivePoints} positive · -{data.rentScore.summary.negativePoints} negative

@@ -6,6 +6,14 @@ export type RentScoreBand = "STRONG" | "STABLE" | "WATCH" | "RISK";
 export type RentScoreRuleConfig = {
   id: string;
   code: string;
+  categoryCode:
+    | "IDENTITY_VERIFICATION"
+    | "PAYMENT"
+    | "RENTER_BEHAVIOUR"
+    | "RENTAL_STABILITY"
+    | "EMPLOYMENT_STABILITY"
+    | "LANDLORD_REFERENCE"
+    | "RENTER_BAND";
   name: string;
   description?: string | null;
   points: number;
@@ -13,6 +21,24 @@ export type RentScoreRuleConfig = {
   isActive: boolean;
   sortOrder: number;
   metadata?: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RentScoreCategoryConfig = {
+  id: string;
+  code:
+    | "IDENTITY_VERIFICATION"
+    | "PAYMENT"
+    | "RENTER_BEHAVIOUR"
+    | "RENTAL_STABILITY"
+    | "EMPLOYMENT_STABILITY"
+    | "LANDLORD_REFERENCE"
+    | "RENTER_BAND";
+  name: string;
+  maxScore: number;
+  isActive: boolean;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +52,7 @@ export type RentScoreConfig = {
   maxScore: number;
   isActive: boolean;
   updatedAt: string;
+  categories: RentScoreCategoryConfig[];
   rules: RentScoreRuleConfig[];
 };
 
@@ -209,6 +236,14 @@ export type PendingManualRentScorePaymentItem = {
 export type RentScoreBreakdownItem = {
   ruleId: string;
   code: string;
+  categoryCode:
+    | "IDENTITY_VERIFICATION"
+    | "PAYMENT"
+    | "RENTER_BEHAVIOUR"
+    | "RENTAL_STABILITY"
+    | "EMPLOYMENT_STABILITY"
+    | "LANDLORD_REFERENCE"
+    | "RENTER_BAND";
   name: string;
   description?: string | null;
   points: number;
@@ -218,6 +253,27 @@ export type RentScoreBreakdownItem = {
   appliedOccurrences: number;
   contribution: number;
   lastOccurredAt?: string | null;
+  overridden?: boolean;
+  overrideScope?: "BREAKDOWN_ITEM" | "CATEGORY" | null;
+  overrideId?: string | null;
+  overrideNote?: string | null;
+};
+
+export type RentScoreCategoryBreakdownItem = {
+  code:
+    | "IDENTITY_VERIFICATION"
+    | "PAYMENT"
+    | "RENTER_BEHAVIOUR"
+    | "RENTAL_STABILITY"
+    | "EMPLOYMENT_STABILITY"
+    | "LANDLORD_REFERENCE"
+    | "RENTER_BAND";
+  name: string;
+  score: number;
+  maxScore: number;
+  overridden?: boolean;
+  overrideId?: string | null;
+  overrideNote?: string | null;
 };
 
 export type RentScoreEventItem = {
@@ -275,6 +331,19 @@ export type RenterScoreSnapshot = {
     eventCount: number;
     scoreBand: RentScoreBand;
   };
+  activeOverrides: Array<{
+    id: string;
+    scope: "BREAKDOWN_ITEM" | "CATEGORY";
+    targetCode: string;
+    note?: string | null;
+    createdAt: string;
+    createdBy?: {
+      id: string;
+      fullName: string;
+      email: string;
+    } | null;
+  }>;
+  categoryBreakdown: RentScoreCategoryBreakdownItem[];
   breakdown: RentScoreBreakdownItem[];
   recentEvents: RentScoreEventItem[];
 };
@@ -291,20 +360,30 @@ export function getRenterScoreDetails(publicAccountId: string) {
   return apiFetch<RenterScoreSnapshot>(`/api/admin/rent-score/accounts/${encodeURIComponent(publicAccountId)}`);
 }
 
-export function getRentScoreConfig() {
-  return apiFetch<RentScoreConfig>("/api/admin/rent-score/config");
+export function listRentScoreRules() {
+  return apiFetch<{ items: RentScoreRuleConfig[] }>("/api/admin/rent-score/rules");
 }
 
-export function updateRentScorePolicy(input: {
-  name?: string;
-  description?: string | null;
-  minScore?: number;
-  maxScore?: number;
-  isActive?: boolean;
-}) {
-  return apiFetch<RentScoreConfig>("/api/admin/rent-score/config", {
+export function getRentScoreSetup() {
+  return apiFetch<RentScoreConfig>("/api/admin/rent-score/setup");
+}
+
+export function updateRentScoreCategory(
+  categoryId: string,
+  input: {
+    name?: string;
+    maxScore?: number;
+  }
+) {
+  return apiFetch<RentScoreConfig>(`/api/admin/rent-score/setup/categories/${encodeURIComponent(categoryId)}`, {
     method: "PATCH",
     body: JSON.stringify(input)
+  });
+}
+
+export function deleteRentScoreCategory(categoryId: string) {
+  return apiFetch<RentScoreConfig>(`/api/admin/rent-score/setup/categories/${encodeURIComponent(categoryId)}`, {
+    method: "DELETE"
   });
 }
 
@@ -312,31 +391,18 @@ export function updateRentScoreRule(
   ruleId: string,
   input: {
     name?: string;
-    description?: string | null;
     points?: number;
-    maxOccurrences?: number | null;
-    isActive?: boolean;
-    sortOrder?: number;
   }
 ) {
-  return apiFetch<RentScoreConfig>(`/api/admin/rent-score/rules/${encodeURIComponent(ruleId)}`, {
+  return apiFetch<RentScoreConfig>(`/api/admin/rent-score/setup/rules/${encodeURIComponent(ruleId)}`, {
     method: "PATCH",
     body: JSON.stringify(input)
   });
 }
 
-export function createRentScoreRule(input: {
-  code: string;
-  name: string;
-  description?: string | null;
-  points: number;
-  maxOccurrences?: number | null;
-  isActive?: boolean;
-  sortOrder?: number;
-}) {
-  return apiFetch<RentScoreConfig>("/api/admin/rent-score/rules", {
-    method: "POST",
-    body: JSON.stringify(input)
+export function deleteRentScoreRule(ruleId: string) {
+  return apiFetch<RentScoreConfig>(`/api/admin/rent-score/setup/rules/${encodeURIComponent(ruleId)}`, {
+    method: "DELETE"
   });
 }
 
@@ -361,6 +427,26 @@ export function deleteRentScoreEvent(eventId: string) {
   });
 }
 
+export function createRentScoreOverride(
+  publicAccountId: string,
+  input: {
+    scope: "BREAKDOWN_ITEM" | "CATEGORY";
+    targetCode: string;
+    note?: string;
+  }
+) {
+  return apiFetch<RenterScoreSnapshot>(`/api/admin/rent-score/accounts/${encodeURIComponent(publicAccountId)}/overrides`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export function deleteRentScoreOverride(overrideId: string) {
+  return apiFetch<RenterScoreSnapshot>(`/api/admin/rent-score/overrides/${encodeURIComponent(overrideId)}`, {
+    method: "DELETE"
+  });
+}
+
 export function listPendingRenterInvites() {
   return apiFetch<{ items: PendingRenterInviteItem[] }>("/api/admin/renter-invites");
 }
@@ -380,27 +466,4 @@ export function resendPendingRenterInvite(proposedRenterId: string) {
       method: "POST"
     }
   );
-}
-
-export function listManualRentScorePayments() {
-  return apiFetch<{ items: PendingManualRentScorePaymentItem[] }>("/api/admin/rent-score/payments/manual");
-}
-
-export function listPendingRentScoreReportApprovals() {
-  return apiFetch<{ items: PendingRentScoreReportApprovalItem[] }>("/api/admin/rent-score/report-approvals");
-}
-
-export function confirmManualRentScorePayment(paymentId: string) {
-  return apiFetch<{ success: true }>(
-    `/api/admin/rent-score/payments/manual/${encodeURIComponent(paymentId)}/confirm`,
-    {
-      method: "POST"
-    }
-  );
-}
-
-export function approveRentScoreReport(paymentId: string) {
-  return apiFetch<{ success: true }>(`/api/admin/rent-score/payments/${encodeURIComponent(paymentId)}/approve-report`, {
-    method: "POST"
-  });
 }

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
-import { formatDate, rentScoreGuidance, scoreBandBadgeClass } from "@/lib/renter-workspace-presenters";
+import { formatDate, rentScoreBandLabel, rentScoreGuidance, scoreBandBadgeClass } from "@/lib/renter-workspace-presenters";
 import { getErrorMessage } from "@/lib/errors";
 import { searchRenterShareRecipients, type ShareRecipientSearchResult } from "@/lib/renter-api";
 import { toast } from "sonner";
@@ -69,7 +69,7 @@ export default function RenterWorkspaceShareScore() {
     <p style="margin-top: 0; color: #475569;">Generated for ${escapeHtml(renterDisplayName)} on ${escapeHtml(new Date().toLocaleDateString())}</p>
     <h2>Score</h2>
     <p style="font-size: 24px; font-weight: bold;">${data.rentScore.summary.score} / ${data.rentScore.summary.maxScore}</p>
-    <p>Band: ${escapeHtml(data.rentScore.summary.scoreBand)}</p>
+    <p>Band: ${escapeHtml(rentScoreBandLabel(data.rentScore.summary.scoreBand))}</p>
     <h2>Profile</h2>
     <p>${escapeHtml(data.profile.email)}<br />${escapeHtml(data.profile.phone)}<br />${escapeHtml(data.profile.address)}, ${escapeHtml(data.profile.city)}, ${escapeHtml(data.profile.state)}</p>
     <h2>Top drivers</h2>
@@ -250,7 +250,7 @@ export default function RenterWorkspaceShareScore() {
                 <span className="ml-2 text-xl font-medium text-slate-400">/ {data.rentScore.summary.maxScore}</span>
               </p>
               <div className="mt-3 flex items-center gap-3">
-                <Badge className={scoreBandBadgeClass(data.rentScore.summary.scoreBand)}>{data.rentScore.summary.scoreBand}</Badge>
+                <Badge className={scoreBandBadgeClass(data.rentScore.summary.scoreBand)}>{rentScoreBandLabel(data.rentScore.summary.scoreBand)}</Badge>
                 <p className="text-sm text-slate-500">{data.summary.profileCompletenessPercent}% profile confidence</p>
               </div>
             </div>
@@ -330,10 +330,7 @@ export default function RenterWorkspaceShareScore() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Search recipient</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    To start input either email, phone number, first name, or last name of the landlord or agent.
-                  </p>
+                  <p className="text-sm font-semibold text-slate-950">Search for Landlord or Agent</p>
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                     <Input
                       value={searchQuery}
@@ -482,7 +479,7 @@ export default function RenterWorkspaceShareScore() {
                     {share.score}
                     <span className="ml-1 text-xs font-medium text-slate-400">/ {share.maxScore}</span>
                   </p>
-                  <Badge className={`mt-2 ${scoreBandBadgeClass(share.scoreBand)}`}>{share.scoreBand}</Badge>
+                  <Badge className={`mt-2 ${scoreBandBadgeClass(share.scoreBand)}`}>{rentScoreBandLabel(share.scoreBand)}</Badge>
                   <p className="mt-2 text-xs text-muted-foreground">{formatDate(share.createdAt)}</p>
                 </div>
               </div>

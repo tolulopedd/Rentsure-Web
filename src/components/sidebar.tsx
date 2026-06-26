@@ -2,9 +2,9 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
-  Scale,
   ClipboardList,
   Building2,
+  SlidersHorizontal,
   UserCircle2,
   LogOut
 } from "lucide-react";
@@ -36,7 +36,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     { label: "Renter Activities", to: "/app/renter-activities", icon: Users },
     { label: "Landlord & Agent Activities", to: "/app/landlord-agent-activities", icon: Building2 },
     { label: "Renter Scores", to: "/app/renters", icon: Users },
-    { label: "Rent Score Setup", to: "/app/rent-score", icon: Scale },
+    { label: "Rent Score Setup", to: "/app/rent-score-setup", icon: SlidersHorizontal },
     ...(canManagePortal(role) ? [{ label: "Profile", to: "/app/profile", icon: UserCircle2 }] : [])
   ];
 

@@ -14,7 +14,7 @@ import AdminUnregisteredRequestsPage from "@/pages/AdminUnregisteredRequestsPage
 import AdminRenterActivitiesPage from "@/pages/AdminRenterActivitiesPage";
 import AdminLandlordAgentActivitiesPage from "@/pages/AdminLandlordAgentActivitiesPage";
 import RentersPage from "@/pages/RentersPage";
-import RentScoreAdminPage from "@/pages/RentScoreAdminPage";
+import RentScoreSetupPage from "@/pages/RentScoreSetupPage";
 import PublicWorkspaceDashboard from "@/pages/PublicWorkspaceDashboard";
 import PublicWorkspaceQueue from "@/pages/PublicWorkspaceQueue";
 import PublicWorkspaceDecisions from "@/pages/PublicWorkspaceDecisions";
@@ -28,6 +28,7 @@ import RenterWorkspaceCases from "@/pages/RenterWorkspaceCases";
 import RenterWorkspaceQueue from "@/pages/RenterWorkspaceQueue";
 import RenterWorkspacePayments from "@/pages/RenterWorkspacePayments";
 import RenterWorkspaceProfile from "@/pages/RenterWorkspaceProfile";
+import RenterWorkspaceBuyScore from "@/pages/RenterWorkspaceBuyScore";
 import RenterWorkspaceShareScore from "@/pages/RenterWorkspaceShareScore";
 import { AccountIndexRedirect, AdminRoute, AppIndexRedirect, PublicWorkspaceRoute, RenterWorkspaceRoute } from "@/app/route-guards";
 
@@ -54,7 +55,7 @@ export const router = createBrowserRouter([
           { path: "cases", element: <RenterWorkspaceCases /> },
           { path: "queue", element: <RenterWorkspaceQueue /> },
           { path: "payments", element: <RenterWorkspacePayments /> },
-          { path: "buy-score", element: <Navigate to="/account/renter/share-score" replace /> },
+          { path: "buy-score", element: <RenterWorkspaceBuyScore /> },
           { path: "profile", element: <RenterWorkspaceProfile /> },
           { path: "share-score", element: <RenterWorkspaceShareScore /> }
         ]
@@ -86,11 +87,11 @@ export const router = createBrowserRouter([
           { path: "renter-activities", element: <AdminRoute element={<AdminRenterActivitiesPage />} /> },
           { path: "landlord-agent-activities", element: <AdminRoute element={<AdminLandlordAgentActivitiesPage />} /> },
           { path: "renters", element: <AdminRoute element={<RentersPage />} /> },
-          { path: "rent-score", element: <AdminRoute element={<RentScoreAdminPage />} /> },
+          { path: "rent-score-setup", element: <AdminRoute element={<RentScoreSetupPage />} /> },
           { path: "profile", element: <Profile /> },
-          { path: "admin", element: <Navigate to="/app/rent-score" replace /> },
-          { path: "users", element: <Navigate to="/app/rent-score" replace /> },
-          { path: "outlets", element: <Navigate to="/app/rent-score" replace /> },
+          { path: "admin", element: <Navigate to="/app/renters" replace /> },
+          { path: "users", element: <Navigate to="/app/renters" replace /> },
+          { path: "outlets", element: <Navigate to="/app/renters" replace /> },
           { path: "customer", element: <Navigate to="/app/renters" replace /> },
           { path: "customer-enquiry", element: <Navigate to="/app/renters" replace /> },
           { path: "customers", element: <Navigate to="/app/renters" replace /> },
@@ -102,8 +103,8 @@ export const router = createBrowserRouter([
           { path: "loans", element: <Navigate to="/app/dashboard" replace /> },
           { path: "reports", element: <Navigate to="/app/dashboard" replace /> },
           { path: "receipts", element: <Navigate to="/app/dashboard" replace /> },
-          { path: "loans-approvals", element: <Navigate to="/app/rent-score" replace /> },
-          { path: "transactions-approvals", element: <Navigate to="/app/rent-score" replace /> },
+          { path: "loans-approvals", element: <Navigate to="/app/renters" replace /> },
+          { path: "transactions-approvals", element: <Navigate to="/app/renters" replace /> },
           { path: "transaction-history", element: <Navigate to="/app/dashboard" replace /> },
           { path: "transactions", element: <Navigate to="/app/dashboard" replace /> },
           { path: "float", element: <Navigate to="/app/dashboard" replace /> },

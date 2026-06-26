@@ -52,7 +52,7 @@ export default function RenterWorkspacePayments() {
   const [submittingDirectPayment, setSubmittingDirectPayment] = useState(false);
 
   const approvedLinkedCases = useMemo(
-    () => data?.linkedCases.filter((item) => item.decision === "APPROVED" && item.propertyUnit) || [],
+    () => data?.linkedCases.filter((item) => item.decision === "APPROVED") || [],
     [data]
   );
 

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
   ClipboardCheck,
   FileCheck2,
   FolderKanban,
   Home,
-  Scale,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -18,8 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getErrorMessage } from "@/lib/errors";
+import { rentScoreBandLabel } from "@/lib/rent-score-band";
 import { getStoredUserRole } from "@/lib/roles";
-import { getRentScoreConfig, listRenterScores, type RentScoreConfig, type RenterScoreListItem } from "@/lib/rent-score-api";
+import { listRenterScores, type RenterScoreListItem } from "@/lib/rent-score-api";
 
 function formatDate(value?: string) {
   if (!value) return "-";
@@ -41,7 +40,6 @@ export default function Dashboard() {
   const role = getStoredUserRole();
   const isAdmin = role === "ADMIN";
   const userName = localStorage.getItem("userName") || (isAdmin ? "Admin" : "Agent");
-  const [config, setConfig] = useState<RentScoreConfig | null>(null);
   const [items, setItems] = useState<RenterScoreListItem[]>([]);
   const [scoreRequestCount, setScoreRequestCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,13 +54,11 @@ export default function Dashboard() {
         setError(null);
         if (!alive) return;
         if (isAdmin) {
-          const [policy, queue] = await Promise.all([getRentScoreConfig(), listRenterScores()]);
+          const queue = await listRenterScores();
           if (!alive) return;
-          setConfig(policy);
           setItems(queue.items);
           setScoreRequestCount(queue.summary.scoreRequestCount);
         } else {
-          setConfig(null);
           setItems([]);
           setScoreRequestCount(0);
         }
@@ -91,11 +87,9 @@ export default function Dashboard() {
       activeProfiles,
       strongProfiles,
       scoreRequestCount,
-      recentProfiles,
-      activeRules: config?.rules.filter((rule) => rule.isActive).length || 0,
-      negativeRules: config?.rules.filter((rule) => rule.points < 0).length || 0
+      recentProfiles
     };
-  }, [config, isAdmin, items, scoreRequestCount]);
+  }, [isAdmin, items, scoreRequestCount]);
 
   if (loading) {
     return <div className="text-muted-foreground">Loading dashboard...</div>;
@@ -127,11 +121,14 @@ export default function Dashboard() {
             <Button asChild className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
               <Link to="/app/renters">
                 Review renter queue
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <Users className="ml-2 h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to="/app/rent-score">Adjust score rules</Link>
+              <Link to="/app/rent-score-setup">
+                Open rent score setup
+                <ClipboardCheck className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </div>
@@ -140,7 +137,7 @@ export default function Dashboard() {
           <MetricCard label="Renter profiles" value={String(adminMetrics.totalProfiles)} icon={Users} tone="blue" />
           <MetricCard label="Active profiles" value={String(adminMetrics.activeProfiles)} icon={ShieldCheck} tone="emerald" />
           <MetricCard label="Rent score requests" value={String(adminMetrics.scoreRequestCount)} icon={ClipboardCheck} tone="amber" />
-          <MetricCard label="Strong score band" value={String(adminMetrics.strongProfiles)} icon={Sparkles} tone="slate" />
+          <MetricCard label="Excellent band" value={String(adminMetrics.strongProfiles)} icon={Sparkles} tone="slate" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -171,7 +168,7 @@ export default function Dashboard() {
                           {item.score}
                           <span className="ml-1 text-sm font-medium text-muted-foreground">/ 900</span>
                         </p>
-                        <p className="text-xs text-muted-foreground">{item.scoreBand}</p>
+                        <p className="text-xs text-muted-foreground">{rentScoreBandLabel(item.scoreBand)}</p>
                       </div>
                     </div>
                   </div>
@@ -182,18 +179,20 @@ export default function Dashboard() {
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Policy health</CardTitle>
+              <CardTitle className="text-lg">Admin focus</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Active policy</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">{config?.name || "Rent score policy"}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{config?.description || "Default rule-based scoring model for renters."}</p>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Current workflow</p>
+                <p className="mt-2 text-lg font-semibold text-slate-950">Search-led admin review</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Work from focused admin modules. Search or filter first, then review only the renter, request, or activity you want to inspect.
+                </p>
               </div>
-              <p><span className="font-medium text-slate-950">Score range:</span> {config?.minScore ?? 0} to {config?.maxScore ?? 900}</p>
-              <p><span className="font-medium text-slate-950">Active rules:</span> {adminMetrics.activeRules}</p>
-              <p><span className="font-medium text-slate-950">Negative controls:</span> {adminMetrics.negativeRules}</p>
-              <p><span className="font-medium text-slate-950">Last update:</span> {formatDate(config?.updatedAt)}</p>
+              <p><span className="font-medium text-slate-950">Score range:</span> 0 to 900</p>
+              <p><span className="font-medium text-slate-950">Score review:</span> Renter Scores</p>
+              <p><span className="font-medium text-slate-950">Score setup:</span> Rent Score Setup</p>
+              <p><span className="font-medium text-slate-950">Support modules:</span> Unregistered Requests, Renter Activities, Landlord and Agent Activities</p>
             </CardContent>
           </Card>
         </div>
@@ -227,7 +226,7 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Role" value="Agent" icon={Users} tone="blue" />
         <MetricCard label="Product focus" value="Renter intake" icon={FolderKanban} tone="slate" />
-        <MetricCard label="Score model" value="0 - 900" icon={Scale} tone="amber" />
+        <MetricCard label="Score model" value="0 - 900" icon={ClipboardCheck} tone="amber" />
         <MetricCard label="Decision path" value="Admin handoff" icon={ShieldCheck} tone="emerald" />
       </div>
 
@@ -407,25 +406,25 @@ const documentChecklist = [
 
 const scoreBands = [
   {
-    label: "High confidence",
+    label: "Excellent",
     range: "750 - 900",
     description: "Likely strong renter profile with good supporting information and healthy trust signals.",
     classes: "border-emerald-100 bg-emerald-50 text-emerald-700"
   },
   {
-    label: "Reviewable",
+    label: "Good",
     range: "500 - 749",
     description: "Generally usable profile, but admin may still need to confirm missing details or inconsistencies.",
     classes: "border-lime-100 bg-lime-50 text-lime-700"
   },
   {
-    label: "Caution",
+    label: "Fair",
     range: "300 - 499",
     description: "More review is needed before this renter should move forward with confidence.",
     classes: "border-amber-100 bg-amber-50 text-amber-700"
   },
   {
-    label: "High risk",
+    label: "High Risk",
     range: "0 - 299",
     description: "Profile likely contains weak evidence or negative history that needs close attention before any approval.",
     classes: "border-rose-100 bg-rose-50 text-rose-700"

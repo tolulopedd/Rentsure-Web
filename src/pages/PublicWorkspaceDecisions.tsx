@@ -5,9 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
-import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { rentScoreBandLabel } from "@/lib/rent-score-band";
 import {
   decideWorkspaceProposedRenter,
   forwardWorkspaceScoreRequest,
@@ -57,28 +59,20 @@ function scoreBandBadgeClass(scoreBand?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function renderRentScoreValue(input: {
-  linkedRentScore: QueueListItem["linkedRentScore"] | QueueDetail["linkedRentScore"];
-  linkedRentScoreReport?: QueueDetail["linkedRentScoreReport"] | null;
-  status?: string | null;
-}) {
-  if (input.linkedRentScoreReport) {
-    return `${input.linkedRentScoreReport.summary.score} / ${input.linkedRentScoreReport.summary.maxScore}`;
-  }
-  if (input.status === "SCORE_SHARED" || input.status === "UNDER_REVIEW" || input.status === "DECISION_READY") {
-    return "Report ready";
-  }
-  if (input.linkedRentScore) {
-    return `${input.linkedRentScore.score} / 900`;
-  }
-  return "In progress";
-}
-
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
       <span className="text-slate-500">{label}</span>
       <span className="text-right font-medium text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function DetailPair({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+      <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">{label}</p>
+      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
     </div>
   );
 }
@@ -114,7 +108,7 @@ export default function PublicWorkspaceDecisions() {
       const resolvedId =
         nextSelectedId && response.items.some((item) => item.id === nextSelectedId)
           ? nextSelectedId
-          : response.items[0]?.id || "";
+          : "";
       setSelectedId(resolvedId);
     } catch (error: unknown) {
       if (!input?.silent) {
@@ -162,9 +156,8 @@ export default function PublicWorkspaceDecisions() {
     async () => {
       const currentSelectedId = selectedId;
       await loadQueue(currentSelectedId, { silent: true });
-      const fallbackSelectedId = currentSelectedId || queue[0]?.id || "";
-      if (fallbackSelectedId) {
-        await loadDetail(fallbackSelectedId, { silent: true });
+      if (currentSelectedId) {
+        await loadDetail(currentSelectedId, { silent: true });
       }
     },
     {
@@ -176,10 +169,9 @@ export default function PublicWorkspaceDecisions() {
   async function requestRentScore() {
     if (!detail) return;
     try {
-      const response = await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
+      await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadQueue(detail.id);
-      setDetail(response);
-      setDecisionNote(response.decision?.note || "");
+      await loadDetail(detail.id);
       toast.success("Rent score requested.");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to request rent score"));
@@ -189,9 +181,9 @@ export default function PublicWorkspaceDecisions() {
   async function forwardScoreRequest() {
     if (!detail?.scoreRequests[0]) return;
     try {
-      const response = await forwardWorkspaceScoreRequest(detail.scoreRequests[0].id);
-      setDetail(response);
+      await forwardWorkspaceScoreRequest(detail.scoreRequests[0].id);
       await loadQueue(detail.id);
+      await loadDetail(detail.id);
       toast.success("Score report forwarded to landlord");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to forward score report"));
@@ -201,13 +193,12 @@ export default function PublicWorkspaceDecisions() {
   async function takeDecision(decision: ProposedRenterDecision) {
     if (!detail) return;
     try {
-      const response = await decideWorkspaceProposedRenter(detail.id, {
+      await decideWorkspaceProposedRenter(detail.id, {
         decision,
         note: decisionNote.trim() || undefined
       });
-      setDetail(response);
-      setDecisionNote(response.decision?.note || "");
       await loadQueue(detail.id);
+      await loadDetail(detail.id);
       toast.success(`Renter marked as ${decisionLabel(decision).toLowerCase()}`);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to save landlord decision"));
@@ -267,7 +258,7 @@ export default function PublicWorkspaceDecisions() {
           <div class="section">
             <h3>Rent Score Summary</h3>
             <p><strong>Score:</strong> ${detail.linkedRentScoreReport.summary.score} / ${detail.linkedRentScoreReport.summary.maxScore}</p>
-            <p><strong>Band:</strong> ${detail.linkedRentScoreReport.summary.scoreBand}</p>
+            <p><strong>Band:</strong> ${rentScoreBandLabel(detail.linkedRentScoreReport.summary.scoreBand)}</p>
             <p><strong>Positive points:</strong> ${detail.linkedRentScoreReport.summary.positivePoints}</p>
             <p><strong>Negative points:</strong> ${detail.linkedRentScoreReport.summary.negativePoints}</p>
             <p><strong>Policy:</strong> ${escapeHtml(detail.linkedRentScoreReport.policy.name)}</p>
@@ -332,91 +323,56 @@ export default function PublicWorkspaceDecisions() {
       </div>
 
       <div className="space-y-4 md:space-y-6">
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Linked tenants</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {loading ? <p className="text-sm text-muted-foreground">Loading decision queue...</p> : null}
-              {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters available yet.</p> : null}
-              {queue.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
-                    selectedId === item.id
-                      ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                      : "border-slate-200 bg-white hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                    <div className="space-y-2">
-                      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property</p>
-                        <p className="font-semibold text-slate-950">{propertyDisplayName(item.property)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Unit</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-slate-700">{propertyUnitDisplayName(item.propertyUnit)}</p>
-                          {item.propertyUnit ? (
-                            <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
-                              {occupancyLabel(item.propertyUnit.isOccupied)}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter</p>
-                        <p className="font-semibold text-slate-950">{renterName(item)}</p>
-                        </div>
-                        <Badge className={decisionBadgeClass(item.decision?.decision)} variant="outline">
-                          {decisionLabel(item.decision?.decision || item.status)}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm text-slate-600">
-                      {!isAgent ? (
-                        <SummaryRow
-                          label="Rent score"
-                          value={renderRentScoreValue({
-                            linkedRentScore: item.linkedRentScore,
-                            status: item.status
-                          })}
-                        />
-                      ) : null}
-                      <SummaryRow label="Decision" value={decisionLabel(item.decision?.decision || item.status)} />
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Linked tenants</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loading ? <p className="text-sm text-muted-foreground">Loading decision queue...</p> : null}
+            {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters available yet.</p> : null}
+            {!loading && queue.length ? (
+              <div className="space-y-2">
+                <Label>Linked tenant</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select linked tenant" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {queue.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
 
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Decision details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {detailLoading ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
-              {!detailLoading && !detail ? <p className="text-sm text-muted-foreground">Select a proposed renter to continue.</p> : null}
-                {detail ? (
-                  <>
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Decision details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {detailLoading ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant to continue.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
+            {detail ? (
+              <>
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <div className="flex items-start justify-between gap-3">
                           <p className="font-semibold text-slate-950">{renterName(detail)}</p>
                           <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
                             {decisionLabel(detail.decision?.decision || detail.status)}
                           </Badge>
                         </div>
-                        <div className="space-y-2 text-sm text-slate-600">
-                          <SummaryRow label="Email" value={detail.email} />
-                          <SummaryRow label="Phone" value={detail.phone} />
-                          <SummaryRow label="Property" value={propertyDisplayName(detail.property)} />
-                          <SummaryRow
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <DetailPair label="Email" value={detail.email} />
+                          <DetailPair label="Phone" value={detail.phone} />
+                          <DetailPair label="Property" value={propertyDisplayName(detail.property)} />
+                          <DetailPair
                             label="Unit"
                             value={
                               detail.propertyUnit
@@ -424,17 +380,12 @@ export default function PublicWorkspaceDecisions() {
                                 : propertyUnitDisplayName(detail.propertyUnit)
                             }
                           />
-                          <SummaryRow label="Address" value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`} />
-                          {!isAgent ? (
-                            <SummaryRow
-                              label="Rent score"
-                              value={renderRentScoreValue({
-                                linkedRentScore: detail.linkedRentScore,
-                                linkedRentScoreReport: detail.linkedRentScoreReport,
-                                status: detail.status
-                              })}
+                          <div className="md:col-span-2">
+                            <DetailPair
+                              label="Address"
+                              value={`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`}
                             />
-                          ) : null}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -452,7 +403,7 @@ export default function PublicWorkspaceDecisions() {
                                 </span>
                               </p>
                               <Badge className={scoreBandBadgeClass(detail.linkedRentScoreReport.summary.scoreBand)} variant="outline">
-                                {detail.linkedRentScoreReport.summary.scoreBand}
+                                {rentScoreBandLabel(detail.linkedRentScoreReport.summary.scoreBand)}
                               </Badge>
                             </div>
                             <p className="mt-2 text-sm text-slate-600">
@@ -636,10 +587,10 @@ export default function PublicWorkspaceDecisions() {
                         ))}
                       </div>
                     </div>
-                  </>
-                ) : null}
-            </CardContent>
-          </Card>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

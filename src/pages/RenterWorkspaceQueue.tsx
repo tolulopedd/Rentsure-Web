@@ -4,6 +4,8 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
@@ -17,10 +19,10 @@ import {
 export default function RenterWorkspaceQueue() {
   const { data, acceptScoreRequest } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
-  const [selectedId, setSelectedId] = useState(linkedCases[0]?.id || "");
+  const [selectedId, setSelectedId] = useState("");
 
   const selectedItem = useMemo(
-    () => linkedCases.find((item) => item.id === selectedId) || linkedCases[0] || null,
+    () => linkedCases.find((item) => item.id === selectedId) || null,
     [linkedCases, selectedId]
   );
   const latestScoreRequest = selectedItem?.scoreRequests[0] || null;
@@ -47,52 +49,30 @@ export default function RenterWorkspaceQueue() {
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.94fr_1.36fr] xl:gap-6">
+      <div className="space-y-4 md:space-y-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">My landlord decisions</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {!linkedCases.length ? <p className="text-sm text-muted-foreground">No property has been linked into your renter workspace yet.</p> : null}
-            {linkedCases.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
-                  selectedItem?.id === item.id
-                    ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-950">{item.property.name}</p>
-                    {item.propertyUnit ? (
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
-                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
-                          {occupancyLabel(item.propertyUnit.isOccupied)}
-                        </Badge>
-                      </div>
-                    ) : null}
-                    <p className="text-sm text-slate-600">{item.property.address}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.property.city}, {item.property.state}
-                    </p>
-                  </div>
-                  <div className="text-left md:text-right">
-                    <Badge className={decisionBadgeClass(item.decision || item.status)} variant="outline">
-                      {item.decision || item.status}
-                    </Badge>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {item.scoreRequests.length} score request{item.scoreRequests.length === 1 ? "" : "s"} · {item.activities.length} timeline event
-                      {item.activities.length === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))}
+            {linkedCases.length ? (
+              <div className="space-y-2">
+                <Label>Linked property</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select linked property" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {linkedCases.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.property.name} · {propertyUnitDisplayName(item.propertyUnit)} · {item.property.city}, {item.property.state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -101,7 +81,8 @@ export default function RenterWorkspaceQueue() {
             <CardTitle className="text-lg">Decision detail</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {!selectedItem ? <p className="text-sm text-muted-foreground">Select a linked property from your queue to continue.</p> : null}
+            {!selectedId ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
+            {selectedId && !selectedItem ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
             {selectedItem ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">

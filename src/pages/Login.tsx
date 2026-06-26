@@ -87,7 +87,7 @@ export default function Login() {
 
       const role: AppRole = rawRole === "ADMIN" ? "ADMIN" : "AGENT";
       toast.success("Logged in");
-      nav(isAgentRole(role) ? "/app/dashboard" : "/app/rent-score");
+      nav(isAgentRole(role) ? "/app/dashboard" : "/app/renters");
     } catch (error: unknown) {
       if (getErrorCode(error) === "EMAIL_NOT_VERIFIED") {
         setUnverifiedEmail(email.trim());

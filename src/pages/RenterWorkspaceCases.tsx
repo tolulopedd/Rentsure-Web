@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { Building2, Clock3, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
@@ -13,14 +16,20 @@ import {
 } from "@/lib/renter-workspace-presenters";
 
 export default function RenterWorkspaceCases() {
-  const { data } = useRenterWorkspace();
+  const { data, requestLandlordReference } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
-  const [selectedId, setSelectedId] = useState(linkedCases[0]?.id || "");
+  const [selectedId, setSelectedId] = useState("");
+  const [referenceNote, setReferenceNote] = useState("");
 
   const selectedCase = useMemo(
-    () => linkedCases.find((item) => item.id === selectedId) || linkedCases[0] || null,
+    () => linkedCases.find((item) => item.id === selectedId) || null,
     [linkedCases, selectedId]
   );
+  const pendingLandlordReferenceRequest =
+    selectedCase?.landlordReferenceRequests.find((request) => request.status === "PENDING") || null;
+  const canShowLandlordReference =
+    selectedCase?.decision === "APPROVED" && Boolean(selectedCase.propertyUnit?.isOccupied);
+  const canRequestLandlordReference = canShowLandlordReference && !pendingLandlordReferenceRequest;
 
   if (!data) return null;
 
@@ -31,49 +40,30 @@ export default function RenterWorkspaceCases() {
         <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-2xl">Track every properties linked to you</h1>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.92fr_1.38fr] xl:gap-6">
+      <div className="space-y-4 md:space-y-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Linked properties</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {!linkedCases.length ? <p className="text-sm text-muted-foreground">No landlord or agent property is linked to your renter account yet.</p> : null}
-            {linkedCases.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-2xl border p-3 text-left transition md:p-4 ${
-                  selectedCase?.id === item.id
-                    ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/60"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
-                }`}
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-950">{item.property.name}</p>
-                    {item.propertyUnit ? (
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <p className="text-sm text-slate-600">{propertyUnitDisplayName(item.propertyUnit)}</p>
-                        <Badge className={occupancyBadgeClass(item.propertyUnit.isOccupied)} variant="outline">
-                          {occupancyLabel(item.propertyUnit.isOccupied)}
-                        </Badge>
-                      </div>
-                    ) : null}
-                    <p className="text-sm text-slate-600">{item.property.address}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.property.city}, {item.property.state}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <Badge className={decisionBadgeClass(item.decision || item.status)} variant="outline">
-                      {item.decision || item.status}
-                    </Badge>
-                    <p className="mt-2 text-xs text-slate-500">{item.paymentSchedules.length} payment schedule{item.paymentSchedules.length === 1 ? "" : "s"}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
+            {linkedCases.length ? (
+              <div className="space-y-2">
+                <Label>Linked property</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select linked property" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {linkedCases.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.property.name} · {propertyUnitDisplayName(item.propertyUnit)} · {item.property.city}, {item.property.state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -82,7 +72,8 @@ export default function RenterWorkspaceCases() {
             <CardTitle className="text-lg">Property detail</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {!selectedCase ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
+            {!selectedId ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
+            {selectedId && !selectedCase ? <p className="text-sm text-muted-foreground">Loading property detail...</p> : null}
             {selectedCase ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -120,6 +111,61 @@ export default function RenterWorkspaceCases() {
                   <MiniCard label="Payment schedules" value={String(selectedCase.paymentSchedules.length)} />
                   <MiniCard label="Timeline events" value={String(selectedCase.activities.length)} />
                 </div>
+
+                {canShowLandlordReference ? (
+                  <Card className="border-slate-200 shadow-none">
+                    <CardHeader className="px-0 pt-0">
+                      <CardTitle className="text-base">Landlord reference</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 px-0 pb-0">
+                      {!selectedCase.landlordReferenceRequests.length ? (
+                        <p className="text-sm text-muted-foreground">No landlord reference request has been submitted for this property yet.</p>
+                      ) : null}
+                      {selectedCase.landlordReferenceRequests.map((request) => (
+                        <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-950">{request.landlordName}</p>
+                              <p className="text-sm text-slate-600">Status: {request.status.replaceAll("_", " ")}</p>
+                              {request.recommendation ? <p className="text-sm text-slate-600">Response: {request.recommendation.replaceAll("_", " ")}</p> : null}
+                              {request.note ? <p className="mt-1 text-sm text-slate-500">{request.note}</p> : null}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(request.respondedAt || request.requestedAt)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
+                        <Label>Reference note</Label>
+                        <textarea
+                          value={referenceNote}
+                          onChange={(event) => setReferenceNote(event.target.value)}
+                          disabled={!canRequestLandlordReference}
+                          className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                          placeholder="Add a short note to the landlord reference request"
+                        />
+                        <Button
+                          variant="outline"
+                          disabled={!canRequestLandlordReference}
+                          onClick={async () => {
+                            const success = await requestLandlordReference(selectedCase.id, referenceNote || undefined);
+                            if (success) {
+                              setReferenceNote("");
+                            }
+                          }}
+                        >
+                          {pendingLandlordReferenceRequest ? "Reference request pending" : "Request landlord reference"}
+                        </Button>
+                        {pendingLandlordReferenceRequest ? (
+                          <p className="text-sm text-slate-500">
+                            A landlord reference request is already pending with {pendingLandlordReferenceRequest.landlordName}. You can request another one after this request is completed or declined.
+                          </p>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <div className="grid gap-4 xl:grid-cols-[1fr_1fr] xl:gap-6">
                   <Card className="border-slate-200 shadow-none">
