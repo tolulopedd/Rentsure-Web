@@ -4,6 +4,7 @@ import { AppLayout } from "@/layouts/AppLayout";
 import RouteError from "@/components/RouteError";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
+import PoliciesPage from "@/pages/PoliciesPage";
 import ResetPassword from "@/pages/ResetPassword";
 import Signup from "@/pages/Signup";
 import VerifyEmail from "@/pages/VerifyEmail";
@@ -34,6 +35,7 @@ import { AccountIndexRedirect, AdminRoute, AppIndexRedirect, PublicWorkspaceRout
 
 export const router = createBrowserRouter([
   { path: "/", element: <Landing />, errorElement: <RouteError /> },
+  { path: "/policies", element: <PoliciesPage />, errorElement: <RouteError /> },
   { path: "/login", element: <Login />, errorElement: <RouteError /> },
   { path: "/reset-password", element: <ResetPassword />, errorElement: <RouteError /> },
   { path: "/signup", element: <Signup />, errorElement: <RouteError /> },

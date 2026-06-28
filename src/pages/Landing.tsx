@@ -6,9 +6,12 @@ import {
   ArrowUpRight,
   BadgeCheck,
   Building2,
+  Database,
   CircleCheckBig,
   Clock3,
   CreditCard,
+  FileText,
+  Lock,
   ShieldCheck,
   Users
 } from "lucide-react";
@@ -101,10 +104,38 @@ const trustStats = [
   { value: "1 view", label: "Unified rent score for all renters in Nigeria." }
 ];
 
+const policyHighlights: Array<{
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: "Terms & Conditions",
+    description: "Overview of our platform rules and account use.",
+    href: "/policies#terms-and-conditions",
+    icon: FileText
+  },
+  {
+    title: "Data policy",
+    description: "Overview of how we collect, use, and protect data.",
+    href: "/policies#data-policy",
+    icon: Database
+  },
+  {
+    title: "Privacy & security",
+    description: "Overview of privacy, consent, and security safeguards.",
+    href: "/policies#privacy-and-security",
+    icon: Lock
+  }
+];
+
 const footerLinks = [
   { label: "Value", href: "#value" },
   { label: "How it works", href: "#how-it-works" },
   { label: "Rent score", href: "#score" },
+  { label: "Policies", href: "#policies" },
+  { label: "Policy details", href: "/policies", internal: true },
   { label: "Sign in", href: "/login", internal: true },
   { label: "Get started", href: "/signup", internal: true }
 ];
@@ -218,18 +249,19 @@ export default function Landing() {
           <a href="#value">Value</a>
           <a href="#how-it-works">How it works</a>
           <a href="#score">Rent score</a>
+          <a href="#policies">Policies</a>
         </nav>
 
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost" className="text-slate-700 hover:bg-white/70 hover:text-slate-950">
             <Link to="/login">Sign in</Link>
           </Button>
-            <Button
-              asChild
-              className="rounded-full bg-[var(--rentsure-blue)] px-5 text-white shadow-lg shadow-[rgba(18,0,255,0.2)] hover:bg-[var(--rentsure-blue-deep)] focus-visible:ring-[var(--rentsure-blue)]"
-            >
-              <Link to="/signup">Get started</Link>
-            </Button>
+          <Button
+            asChild
+            className="rounded-full bg-[var(--rentsure-blue)] px-5 text-white shadow-lg shadow-[rgba(18,0,255,0.2)] hover:bg-[var(--rentsure-blue-deep)] focus-visible:ring-[var(--rentsure-blue)]"
+          >
+            <Link to="/signup">Get started</Link>
+          </Button>
         </div>
       </header>
 
@@ -418,9 +450,9 @@ export default function Landing() {
                     <div className="mt-8 space-y-4">
                       {item.bullets.map((bullet) => (
                         <div key={bullet} className="flex items-start gap-3">
-                      <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
-                        <CircleCheckBig className="h-4 w-4" />
-                      </div>
+                          <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
+                            <CircleCheckBig className="h-4 w-4" />
+                          </div>
                           <p className="text-sm leading-6 text-slate-700">{bullet}</p>
                         </div>
                       ))}
@@ -487,13 +519,97 @@ export default function Landing() {
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="mt-4 text-lg font-semibold">{signal.label}</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-300">
-                        {signal.description}
-                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-300">{signal.description}</div>
                     </div>
                   );
                 })}
               </div>
+            </div>
+
+            <div className="mt-10 border-t border-white/10 pt-8">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="text-sm font-semibold uppercase tracking-[0.22em] text-blue-300">Policy summary</div>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">
+                    RentSure publishes Terms and Conditions, privacy commitments, and data policies so renters,
+                    landlords, and agents understand how information is collected, used, protected, and retained.
+                  </p>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                >
+                  <Link to="/policies">
+                    Read full policy details
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="policies" className="mx-auto w-full max-w-7xl px-6 pb-24 lg:px-10">
+          <div className="rounded-[2rem] border border-slate-200/80 bg-white/90 px-8 py-10 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.2)] lg:px-10 lg:py-12">
+            <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Policies</div>
+                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
+                  Overview of our policies.
+                </h2>
+                <p className="mt-4 max-w-md text-base leading-7 text-slate-600">
+                  Select a policy below to read the full details.
+                </p>
+                <div className="mt-6 hidden lg:block">
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                  >
+                    <Link to="/policies">
+                      View all policies
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {policyHighlights.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.title}
+                      className="rounded-[1.35rem] border border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8faff_100%)] p-4 transition hover:-translate-y-0.5 hover:border-[var(--rentsure-blue)]/25 hover:shadow-[0_20px_50px_-35px_rgba(18,0,255,0.28)]"
+                      to={item.href}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-base font-semibold text-slate-950">{item.title}</h3>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">{item.description}</p>
+                        </div>
+                        <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-slate-400" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-6 lg:hidden">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full rounded-full border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+              >
+                <Link to="/policies">
+                  View all policies
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         </section>
@@ -540,17 +656,17 @@ export default function Landing() {
               <div>
                 <BrandLogo size="sm" />
                 <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-              RentSure helps tenants build trust early and helps landlords or agents make rental decisions with more confidence.
+                  RentSure helps tenants build trust early and helps landlords or agents make rental decisions with more confidence.
                 </p>
                 <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--rentsure-blue)]/10 bg-[var(--rentsure-blue-soft)]/50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
                   <span className="h-2 w-2 rounded-full bg-[var(--rentsure-blue)]" />
-                  Made for Nigeria rental decisions
+                  Built for smarter renting in Nigeria
                 </div>
               </div>
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Quick links</p>
-                <div className="mt-4 grid gap-2.5 text-sm text-slate-600">
+                <div className="mt-4 grid grid-cols-2 gap-2.5 text-sm text-slate-600">
                   {footerLinks.map((item) =>
                     item.internal ? (
                       <Link
