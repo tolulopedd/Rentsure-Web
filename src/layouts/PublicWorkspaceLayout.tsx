@@ -55,17 +55,17 @@ export function PublicWorkspaceLayout() {
                   <span className="hidden sm:inline">{item.label}</span>
                 </NavLink>
               ))}
-              </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="shrink-0 rounded-full px-2.5 text-xs text-[var(--rentsure-blue)] hover:bg-slate-100"
+                className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-[var(--rentsure-blue)] hover:bg-slate-100"
                 onClick={logout}
               >
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Logout</span>
+                <LogOut className="mr-1.5 h-4 w-4" />
+                Logout
               </Button>
+              </div>
             </div>
           </div>
           <main className="relative flex-1 overflow-y-auto p-3 md:p-6">

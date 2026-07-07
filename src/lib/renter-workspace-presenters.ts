@@ -78,3 +78,26 @@ export function rentScoreGuidance(score: number) {
     message: "Your current rent score is high risk and may affect approval. Improve it by updating your profile, verifying identity, and confirming rent or utility payments."
   };
 }
+
+export function rentScoreDriverDetail(item: {
+  code: string;
+  quantity: number;
+  appliedOccurrences: number;
+  description?: string | null;
+}) {
+  if (item.code === "RENTAL_STABILITY") {
+    const moveLabel = item.quantity === 1 ? "move" : "moves";
+    return `${item.quantity} ${moveLabel} in last 5 years`;
+  }
+
+  if (item.code === "EMPLOYMENT_STABILITY") {
+    const employerLabel = item.quantity === 1 ? "employer" : "employers";
+    return `${item.quantity} ${employerLabel} in last 5 years`;
+  }
+
+  if (item.code === "RENTER_BAND") {
+    return item.quantity > 0 ? `Linked annual rent: ${formatNgn(item.quantity)}` : "No linked annual rent";
+  }
+
+  return item.description || `${item.appliedOccurrences} applied occurrence(s)`;
+}

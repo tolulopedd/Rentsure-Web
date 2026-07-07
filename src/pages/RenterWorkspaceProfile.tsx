@@ -31,7 +31,8 @@ export default function RenterWorkspaceProfile() {
     city: "",
     address: "",
     residenceMoveCount5y: "",
-    employerCount5y: "",
+    employmentType: "",
+    employmentYears: "",
     notes: ""
   });
   const [nin, setNin] = useState("");
@@ -59,7 +60,8 @@ export default function RenterWorkspaceProfile() {
       city: data.profile.city || "",
       address: data.profile.address || "",
       residenceMoveCount5y: data.profile.residenceMoveCount5y == null ? "" : String(Math.min(5, data.profile.residenceMoveCount5y)),
-      employerCount5y: data.profile.employerCount5y == null ? "" : String(Math.min(5, data.profile.employerCount5y)),
+      employmentType: data.profile.employmentType || "",
+      employmentYears: data.profile.employmentYears == null ? "" : String(Math.min(5, data.profile.employmentYears)),
       notes: data.profile.notes || ""
     });
     setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
@@ -92,7 +94,8 @@ export default function RenterWorkspaceProfile() {
       city: profileDraft.city,
       address: profileDraft.address,
       residenceMoveCount5y: profileDraft.residenceMoveCount5y ? Number(profileDraft.residenceMoveCount5y) : null,
-      employerCount5y: profileDraft.employerCount5y ? Number(profileDraft.employerCount5y) : null,
+      employmentType: profileDraft.employmentType ? (profileDraft.employmentType as "EMPLOYED" | "SELF_EMPLOYED") : null,
+      employmentYears: profileDraft.employmentYears ? Number(profileDraft.employmentYears) : null,
       notes: profileDraft.notes || null
     });
     if (success) {
@@ -274,9 +277,7 @@ export default function RenterWorkspaceProfile() {
                 options={[
                   { value: "1", label: "1 move" },
                   { value: "2", label: "2 moves" },
-                  { value: "3", label: "3 moves" },
-                  { value: "4", label: "4 moves" },
-                  { value: "5", label: "5 moves" }
+                  { value: "3", label: "3 or more moves" }
                 ]}
                 onChange={(value) => {
                   setProfileDirty(true);
@@ -284,19 +285,34 @@ export default function RenterWorkspaceProfile() {
                 }}
               />
               <SelectField
-                label="Employers in last 5 years"
-                value={profileDraft.employerCount5y}
-                placeholder="Select employer count"
+                label="Employment type"
+                value={profileDraft.employmentType}
+                placeholder="Select employment type"
                 options={[
-                  { value: "1", label: "1 employer" },
-                  { value: "2", label: "2 employers" },
-                  { value: "3", label: "3 employers" },
-                  { value: "4", label: "4 employers" },
-                  { value: "5", label: "5+ employers" }
+                  { value: "EMPLOYED", label: "Employed" },
+                  { value: "SELF_EMPLOYED", label: "Self employed" }
                 ]}
                 onChange={(value) => {
                   setProfileDirty(true);
-                  setProfileDraft((current) => ({ ...current, employerCount5y: value }));
+                  setProfileDraft((current) => ({ ...current, employmentType: value, employmentYears: "" }));
+                }}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label={profileDraft.employmentType === "SELF_EMPLOYED" ? "Years self employed" : "Years employed"}
+                value={profileDraft.employmentYears}
+                placeholder="Select number of years"
+                options={[
+                  { value: "1", label: "1 year" },
+                  { value: "2", label: "2 years" },
+                  { value: "3", label: "3 years" },
+                  { value: "4", label: "4 years" },
+                  { value: "5", label: "5+ years" }
+                ]}
+                onChange={(value) => {
+                  setProfileDirty(true);
+                  setProfileDraft((current) => ({ ...current, employmentYears: value }));
                 }}
               />
             </div>

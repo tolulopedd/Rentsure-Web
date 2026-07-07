@@ -8,6 +8,7 @@ import { getRenterOnboarding } from "@/lib/onboarding";
 import {
   decisionBadgeClass,
   formatDate,
+  rentScoreDriverDetail,
   rentScoreBandLabel,
   scoreBandBadgeClass
 } from "@/lib/renter-workspace-presenters";
@@ -126,13 +127,12 @@ export default function RenterWorkspaceDashboard() {
           <CardContent className="space-y-3">
             {data.rentScore.breakdown
               .filter((item) => item.appliedOccurrences > 0)
-              .slice(0, 8)
               .map((item) => (
                 <div key={item.ruleId} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-semibold text-slate-950">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.appliedOccurrences} applied occurrence(s)</p>
+                      <p className="text-xs text-muted-foreground">{rentScoreDriverDetail(item)}</p>
                     </div>
                     <div className={`text-sm font-semibold ${item.contribution >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
                       {item.contribution > 0 ? "+" : ""}

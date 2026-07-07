@@ -35,7 +35,8 @@ type RenterWorkspaceContextValue = {
     city?: string;
     address?: string;
     residenceMoveCount5y?: number | null;
-    employerCount5y?: number | null;
+    employmentType?: "EMPLOYED" | "SELF_EMPLOYED" | null;
+    employmentYears?: number | null;
     notes?: string | null;
   }) => Promise<boolean>;
   verifyIdentityValue: (input: {
@@ -157,7 +158,8 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     city?: string;
     address?: string;
     residenceMoveCount5y?: number | null;
-    employerCount5y?: number | null;
+    employmentType?: "EMPLOYED" | "SELF_EMPLOYED" | null;
+    employmentYears?: number | null;
     notes?: string | null;
   }) {
     try {

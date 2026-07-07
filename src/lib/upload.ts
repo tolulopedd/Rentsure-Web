@@ -69,10 +69,6 @@ export async function uploadPublicAccountDocument(input: {
       throw error;
     }
 
-    if (import.meta.env.PROD) {
-      throw new Error("Document storage is not configured yet. Please contact RentSure support.");
-    }
-
     const base64Data = await blobToBase64(input.file);
     const localUpload = await apiFetch<{
       objectKey: string;

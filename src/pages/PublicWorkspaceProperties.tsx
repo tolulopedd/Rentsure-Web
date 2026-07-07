@@ -494,7 +494,7 @@ export default function PublicWorkspaceProperties() {
       } else {
         await createWorkspaceProperty(payload);
         await loadProperties();
-        toast.success("Property added to workspace");
+        toast.success("Property added");
       }
 
       resetForm();
@@ -577,8 +577,8 @@ export default function PublicWorkspaceProperties() {
           <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Properties</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {isLandlord
-              ? "Track each linked property by location. Add one property per address, then add another entry when you want to capture a different building, a new location, or another same-location property separately."
-              : "Track the properties your linked landlords have attached to your workspace."}
+              ? "Manage your properties and units."
+              : "View properties shared with you."}
           </p>
         </div>
 
@@ -604,10 +604,7 @@ export default function PublicWorkspaceProperties() {
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Add property"}</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Capture one property location at a time. If the property is already occupied, add the current tenant
-              details so the record is easier to identify later.
-            </p>
+            <p className="text-sm text-muted-foreground">Add one property and its units.</p>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -716,8 +713,8 @@ export default function PublicWorkspaceProperties() {
                         <LovEmpty
                           text={
                             mapboxAccessToken
-                              ? "No city/town suggestion matched that search. Continue typing to use your own city/town."
-                              : "Set VITE_MAPBOX_ACCESS_TOKEN to use live city/town suggestions."
+                              ? "No matches found. Continue typing to enter your own city/town."
+                              : "No matches found. Enter your city/town manually."
                           }
                         />
                       ) : null}
@@ -772,15 +769,15 @@ export default function PublicWorkspaceProperties() {
                 label="Property owner"
                 value={draft.ownerName}
                 onChange={(value) => setDraft((current) => ({ ...current, ownerName: value }))}
-                placeholder={isLandlord ? "Defaults to your landlord profile" : "Enter landlord name"}
-                readOnly={Boolean(editingPropertyId) && isLandlord}
+                placeholder={isLandlord ? "From your landlord profile" : "Enter landlord name"}
+                readOnly={isLandlord}
               />
               <TextField
                 label="Landlord email"
                 value={draft.landlordEmail}
                 onChange={(value) => setDraft((current) => ({ ...current, landlordEmail: value }))}
-                placeholder={isLandlord ? "Defaults to your verified landlord email" : "Enter landlord email"}
-                readOnly={Boolean(editingPropertyId) && isLandlord}
+                placeholder={isLandlord ? "From your verified landlord profile" : "Enter landlord email"}
+                readOnly={isLandlord}
               />
             </div>
 
@@ -788,9 +785,7 @@ export default function PublicWorkspaceProperties() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Unit details</p>
-                  <p className="text-sm text-muted-foreground">
-                    Add the units in this same location, for example Ground Floor, First Floor, or Second Floor.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Add each unit separately.</p>
                 </div>
                 <Button type="button" variant="outline" onClick={addUnit}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -806,7 +801,7 @@ export default function PublicWorkspaceProperties() {
                         <p className="text-sm font-semibold text-slate-950">
                           {index === 0 ? "Primary unit" : `Additional unit ${index + 1}`}
                         </p>
-                        <p className="text-sm text-muted-foreground">Capture the unit detail and occupancy for this specific space.</p>
+                        <p className="text-sm text-muted-foreground">Add unit details and occupancy.</p>
                       </div>
                       <Button
                         type="button"
@@ -868,9 +863,7 @@ export default function PublicWorkspaceProperties() {
                       />
                       <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
                         <p className="font-medium text-slate-950">Rent band input</p>
-                        <p className="mt-1">
-                          This annual rent amount is used to derive the renter-band score for tenants linked to this unit.
-                        </p>
+                        <p className="mt-1">Used to calculate renter band.</p>
                       </div>
                     </div>
 
@@ -979,7 +972,7 @@ export default function PublicWorkspaceProperties() {
           {loading ? <p className="text-sm text-muted-foreground">Loading properties...</p> : null}
           {!loading && error ? <p className="text-sm text-rose-600">{error}</p> : null}
           {!loading && !items.length && !error ? (
-            <p className="text-sm text-muted-foreground">No properties linked yet. Use the button above to add your first property.</p>
+            <p className="text-sm text-muted-foreground">No properties yet.</p>
           ) : null}
 
           {items.length ? (

@@ -65,20 +65,16 @@ export function RenterWorkspaceSidebar() {
               </NavLink>
             );
           })}
+
+          <Button
+            variant="ghost"
+            className="w-full justify-start rounded-xl px-3 py-2.5 text-sm text-[var(--rentsure-blue)] hover:bg-slate-50"
+            onClick={logout}
+          >
+            <LogOut className="mr-3 h-4 w-4 opacity-80" />
+            <span className="font-medium">Logout</span>
+          </Button>
         </nav>
-      </div>
-
-      <Separator />
-
-      <div className="p-3">
-        <Button
-          variant="ghost"
-          className="w-full justify-start rounded-xl text-[var(--rentsure-blue)] hover:bg-slate-50"
-          onClick={logout}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
       </div>
     </div>
   );

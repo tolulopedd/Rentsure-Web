@@ -73,15 +73,12 @@ function configuredCategoryPoints(
     const rentCodes = [
       "RENT_PAID_ON_OR_BEFORE_DUE_DATE",
       "RENT_PAID_WITHIN_GRACE_PERIOD",
-      "RENT_PAID_31_TO_90_DAYS_LATE",
-      "RENT_PAID_OVER_90_DAYS_LATE",
-      "RENT_DEFAULTED_OR_EVICTED"
+      "RENT_MISSED"
     ];
     const utilityCodes = [
-      "UTILITY_NO_OUTSTANDING_DEBT",
-      "UTILITY_MINOR_OUTSTANDING_DEBT",
-      "UTILITY_SIGNIFICANT_OUTSTANDING_DEBT",
-      "UTILITY_DISCONNECTION"
+      "UTILITY_PAID_ON_TIME",
+      "UTILITY_PAID_WITHIN_GRACE_PERIOD",
+      "UTILITY_MISSED"
     ];
 
     const maxRent = activeRules.filter((rule) => rentCodes.includes(rule.code)).reduce((max, rule) => Math.max(max, rule.points), 0);
@@ -90,13 +87,19 @@ function configuredCategoryPoints(
   }
 
   if (categoryCode === "RENTER_BEHAVIOUR") {
-    const ratingCodes = [
-      "RENTAL_BEHAVIOUR_EXCELLENT",
-      "RENTAL_BEHAVIOUR_GOOD",
-      "RENTAL_BEHAVIOUR_FAIR",
-      "RENTAL_BEHAVIOUR_POOR"
+    const maintenanceCodes = [
+      "PROPERTY_MAINTENANCE_EXCELLENT",
+      "PROPERTY_MAINTENANCE_GOOD",
+      "PROPERTY_MAINTENANCE_POOR"
     ];
-    return activeRules.filter((rule) => ratingCodes.includes(rule.code)).reduce((max, rule) => Math.max(max, rule.points), 0);
+    const complianceCodes = [
+      "LEASE_COMPLIANCE_EXCELLENT",
+      "LEASE_COMPLIANCE_GOOD",
+      "LEASE_COMPLIANCE_POOR"
+    ];
+    const maintenanceMax = activeRules.filter((rule) => maintenanceCodes.includes(rule.code)).reduce((max, rule) => Math.max(max, rule.points), 0);
+    const complianceMax = activeRules.filter((rule) => complianceCodes.includes(rule.code)).reduce((max, rule) => Math.max(max, rule.points), 0);
+    return Math.max(maintenanceMax, 0) + Math.max(complianceMax, 0);
   }
 
   return activeRules.reduce((max, rule) => Math.max(max, rule.points), 0);

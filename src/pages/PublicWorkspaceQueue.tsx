@@ -37,7 +37,7 @@ function renterName(item: { firstName: string; lastName: string; organizationNam
   return item.organizationName || [item.firstName, item.lastName].filter(Boolean).join(" ");
 }
 
-type BehaviourRating = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
+type BehaviourRating = "EXCELLENT" | "GOOD" | "POOR";
 type ReferenceRecommendation = "STRONGLY_RECOMMEND" | "RECOMMEND" | "NEUTRAL" | "DO_NOT_RECOMMEND";
 
 type ReferenceDraft = {
@@ -84,8 +84,8 @@ export default function PublicWorkspaceQueue() {
   const [searchResults, setSearchResults] = useState<WorkspaceRenterSearchResult[]>([]);
   const [selectedExistingRenter, setSelectedExistingRenter] = useState<WorkspaceRenterSearchResult | null>(null);
   const [invitePreviewUrl, setInvitePreviewUrl] = useState<string | null>(null);
-  const [behaviourRating, setBehaviourRating] = useState<BehaviourRating>("GOOD");
-  const [damagesReported, setDamagesReported] = useState(false);
+  const [propertyMaintenanceRating, setPropertyMaintenanceRating] = useState<BehaviourRating>("GOOD");
+  const [leaseComplianceRating, setLeaseComplianceRating] = useState<BehaviourRating>("GOOD");
   const [behaviourNote, setBehaviourNote] = useState("");
   const [referenceDrafts, setReferenceDrafts] = useState<Record<string, ReferenceDraft>>({});
   const isAgent = (localStorage.getItem("userRole") || "").toUpperCase() === "AGENT";
@@ -156,9 +156,10 @@ export default function PublicWorkspaceQueue() {
   useEffect(() => {
     if (!detail) return;
 
-    const nextBehaviourRating = getBehaviourRatingFromDetail(detail);
-    setBehaviourRating(nextBehaviourRating || "GOOD");
-    setDamagesReported(hasDamagesReported(detail));
+    const nextPropertyMaintenanceRating = getPropertyMaintenanceRatingFromDetail(detail);
+    const nextLeaseComplianceRating = getLeaseComplianceRatingFromDetail(detail);
+    setPropertyMaintenanceRating(nextPropertyMaintenanceRating || "GOOD");
+    setLeaseComplianceRating(nextLeaseComplianceRating || "GOOD");
     setBehaviourNote("");
 
     setReferenceDrafts((current) => {
@@ -340,8 +341,8 @@ export default function PublicWorkspaceQueue() {
     if (!detail) return;
     try {
       await submitWorkspaceRenterBehaviourReview(detail.id, {
-        rating: behaviourRating,
-        damagesReported,
+        propertyMaintenanceRating,
+        leaseComplianceRating,
         note: behaviourNote || undefined
       });
       await loadQueue(detail.id);
@@ -663,23 +664,31 @@ export default function PublicWorkspaceQueue() {
                         </CardHeader>
                         <CardContent className="space-y-3 px-0 pb-0">
                           <div className="space-y-2">
-                            <Label>Behaviour rating</Label>
-                            <Select value={behaviourRating} onValueChange={(value) => setBehaviourRating(value as typeof behaviourRating)}>
+                            <Label>Property maintenance</Label>
+                            <Select value={propertyMaintenanceRating} onValueChange={(value) => setPropertyMaintenanceRating(value as BehaviourRating)}>
                               <SelectTrigger className="bg-white">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-white">
                                 <SelectItem value="EXCELLENT">Excellent</SelectItem>
                                 <SelectItem value="GOOD">Good</SelectItem>
-                                <SelectItem value="FAIR">Fair</SelectItem>
                                 <SelectItem value="POOR">Poor</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
-                          <label className="flex items-center gap-2 text-sm text-slate-700">
-                            <input type="checkbox" checked={damagesReported} onChange={(event) => setDamagesReported(event.target.checked)} />
-                            Damages or serious misuse reported
-                          </label>
+                          <div className="space-y-2">
+                            <Label>General lease compliance</Label>
+                            <Select value={leaseComplianceRating} onValueChange={(value) => setLeaseComplianceRating(value as BehaviourRating)}>
+                              <SelectTrigger className="bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white">
+                                <SelectItem value="EXCELLENT">Excellent</SelectItem>
+                                <SelectItem value="GOOD">Good</SelectItem>
+                                <SelectItem value="POOR">Poor</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <div className="space-y-2">
                             <Label>Review note</Label>
                             <Textarea value={behaviourNote} onChange={(event) => setBehaviourNote(event.target.value)} className="bg-white" />
@@ -819,15 +828,18 @@ function decisionBadgeClass(decision?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
-function getBehaviourRatingFromDetail(detail: QueueDetail): BehaviourRating | null {
+function getPropertyMaintenanceRatingFromDetail(detail: QueueDetail): BehaviourRating | null {
   const codes = detail.linkedRentScoreReport?.breakdown || [];
-  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_EXCELLENT" && item.quantity > 0)) return "EXCELLENT";
-  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_GOOD" && item.quantity > 0)) return "GOOD";
-  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_FAIR" && item.quantity > 0)) return "FAIR";
-  if (codes.some((item) => item.code === "RENTAL_BEHAVIOUR_POOR" && item.quantity > 0)) return "POOR";
+  if (codes.some((item) => item.code === "PROPERTY_MAINTENANCE_EXCELLENT" && item.quantity > 0)) return "EXCELLENT";
+  if (codes.some((item) => item.code === "PROPERTY_MAINTENANCE_GOOD" && item.quantity > 0)) return "GOOD";
+  if (codes.some((item) => item.code === "PROPERTY_MAINTENANCE_POOR" && item.quantity > 0)) return "POOR";
   return null;
 }
 
-function hasDamagesReported(detail: QueueDetail) {
-  return (detail.linkedRentScoreReport?.breakdown || []).some((item) => item.code === "DAMAGES_REPORTED" && item.quantity > 0);
+function getLeaseComplianceRatingFromDetail(detail: QueueDetail): BehaviourRating | null {
+  const codes = detail.linkedRentScoreReport?.breakdown || [];
+  if (codes.some((item) => item.code === "LEASE_COMPLIANCE_EXCELLENT" && item.quantity > 0)) return "EXCELLENT";
+  if (codes.some((item) => item.code === "LEASE_COMPLIANCE_GOOD" && item.quantity > 0)) return "GOOD";
+  if (codes.some((item) => item.code === "LEASE_COMPLIANCE_POOR" && item.quantity > 0)) return "POOR";
+  return null;
 }

@@ -21,7 +21,7 @@ export function PublicWorkspaceTopbar() {
         <div className="min-w-0">
           <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)] md:text-base">Property workspace</div>
           <div className="hidden text-[11px] text-muted-foreground sm:block">
-            Shared queue for landlords and agents managing proposed renters and payment schedules
+            Manage properties, tenants, decisions, and payments
           </div>
         </div>
 

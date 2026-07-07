@@ -613,8 +613,8 @@ export function commentOnWorkspaceProposedRenter(proposedRenterId: string, messa
 export function submitWorkspaceRenterBehaviourReview(
   proposedRenterId: string,
   input: {
-    rating: "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
-    damagesReported?: boolean;
+    propertyMaintenanceRating: "EXCELLENT" | "GOOD" | "POOR";
+    leaseComplianceRating: "EXCELLENT" | "GOOD" | "POOR";
     note?: string;
     complaints?: string[];
   }

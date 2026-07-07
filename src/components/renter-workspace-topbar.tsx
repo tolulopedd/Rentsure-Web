@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, UserCircle2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,6 +14,7 @@ export function RenterWorkspaceTopbar() {
   const photoUrl = data?.profile.passportPhoto?.viewUrl || "";
   const [photoFailed, setPhotoFailed] = useState(false);
   const [ngTime, setNgTime] = useState("");
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
 
   const notifications = useMemo(() => {
     if (!data) return [];
@@ -32,9 +33,22 @@ export function RenterWorkspaceTopbar() {
     });
   }, [data]);
 
+  const visibleNotifications = useMemo(
+    () => notifications.filter((notification) => !dismissedNotificationIds.includes(notification.id)),
+    [dismissedNotificationIds, notifications]
+  );
+
+  function closeNotification(notificationId: string) {
+    setDismissedNotificationIds((current) => (current.includes(notificationId) ? current : [...current, notificationId]));
+  }
+
   useEffect(() => {
     setPhotoFailed(false);
   }, [photoUrl]);
+
+  useEffect(() => {
+    setDismissedNotificationIds((current) => current.filter((id) => notifications.some((notification) => notification.id === id)));
+  }, [notifications]);
 
   useEffect(() => {
     const update = () => {
@@ -78,9 +92,9 @@ export function RenterWorkspaceTopbar() {
                 aria-label="Open notifications"
               >
                 <Bell className="h-5 w-5" />
-                {data && data.summary.unreadNotifications > 0 ? (
+                {visibleNotifications.length > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--rentsure-blue)] px-1.5 text-[10px] font-semibold text-white">
-                    {data.summary.unreadNotifications}
+                    {visibleNotifications.length}
                   </span>
                 ) : null}
               </button>
@@ -89,20 +103,18 @@ export function RenterWorkspaceTopbar() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-950">Notifications</p>
-                  <p className="text-xs text-slate-500">{notifications.length}</p>
+                  <p className="text-xs text-slate-500">{visibleNotifications.length}</p>
                 </div>
-                {!notifications.length ? <p className="text-sm text-slate-500">No notifications right now.</p> : null}
-                {notifications.slice(0, 5).map((notification) => (
+                {!visibleNotifications.length ? <p className="text-sm text-slate-500">No notifications right now.</p> : null}
+                {visibleNotifications.map((notification) => (
                   <div key={notification.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <p className="font-medium text-slate-950">{notification.title}</p>
                     <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-xs text-slate-500">{formatDate(notification.createdAt)}</p>
-                      {notification.ctaPath ? (
-                        <Button asChild variant="outline" size="sm">
-                          <Link to={notification.ctaPath}>{notification.ctaLabel || "Open"}</Link>
-                        </Button>
-                      ) : null}
+                      <Button type="button" variant="outline" size="sm" onClick={() => closeNotification(notification.id)}>
+                        Close
+                      </Button>
                     </div>
                   </div>
                 ))}

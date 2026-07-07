@@ -52,7 +52,7 @@ export default function RenterWorkspacePayments() {
   const [submittingDirectPayment, setSubmittingDirectPayment] = useState(false);
 
   const approvedLinkedCases = useMemo(
-    () => data?.linkedCases.filter((item) => item.decision === "APPROVED") || [],
+    () => data?.linkedCases.filter((item) => item.decision === "APPROVED" && item.propertyUnit) || [],
     [data]
   );
 
@@ -338,8 +338,10 @@ export default function RenterWorkspacePayments() {
             {!pendingApprovedSchedules.length ? (
               <p className="text-sm text-muted-foreground">No landlord payment requests are waiting right now.</p>
             ) : null}
-            {pendingApprovedSchedules.map((schedule) => (
-              <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
+            {pendingApprovedSchedules.map((schedule) => {
+              const proofLocked = Boolean(schedule.confirmationInitiatedAt);
+              return (
+                <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold text-slate-950">{paymentTypeLabel(schedule.paymentType)}</p>
@@ -368,12 +370,14 @@ export default function RenterWorkspacePayments() {
                     value={receiptById[schedule.id] || ""}
                     onChange={(value) => setReceiptById((current) => ({ ...current, [schedule.id]: value }))}
                     placeholder="Enter receipt reference"
+                    disabled={proofLocked}
                   />
                   <FormField
                     label="Payment note"
                     value={noteById[schedule.id] || ""}
                     onChange={(value) => setNoteById((current) => ({ ...current, [schedule.id]: value }))}
                     placeholder="Add payment note"
+                    disabled={proofLocked}
                   />
                 </div>
                 <div className="mt-3 space-y-2">
@@ -383,7 +387,7 @@ export default function RenterWorkspacePayments() {
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     className="bg-white"
-                    disabled={uploadingId === schedule.id}
+                    disabled={uploadingId === schedule.id || proofLocked}
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (file) {
@@ -396,14 +400,24 @@ export default function RenterWorkspacePayments() {
                   {schedule.confirmationInitiatedAt ? (
                     <p className="text-xs text-amber-700">Proof sent on {formatDate(schedule.confirmationInitiatedAt)}. Awaiting landlord confirmation.</p>
                   ) : null}
+                  {proofLocked ? (
+                    <p className="text-xs text-slate-500">
+                      This payment proof is locked while the landlord reviews it. If you need to send another proof, initiate a new payment instead.
+                    </p>
+                  ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-3">
-                  <Button variant="outline" onClick={() => void initiateConfirmation(schedule.id)} disabled={initiatingId === schedule.id}>
-                    {initiatingId === schedule.id ? "Sending..." : schedule.confirmationInitiatedAt ? "Update proof of payment" : "Send proof to landlord"}
+                  <Button
+                    variant="outline"
+                    onClick={() => void initiateConfirmation(schedule.id)}
+                    disabled={initiatingId === schedule.id || proofLocked}
+                  >
+                    {initiatingId === schedule.id ? "Sending..." : proofLocked ? "Proof submitted" : "Send proof to landlord"}
                   </Button>
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -476,18 +490,27 @@ function FormField({
   value,
   onChange,
   placeholder,
-  type = "text"
+  type = "text",
+  disabled = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   type?: "text" | "number" | "date";
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="bg-white" />
+      <Input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="bg-white"
+        disabled={disabled}
+      />
     </div>
   );
 }

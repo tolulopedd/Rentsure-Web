@@ -14,7 +14,8 @@ export type RenterDashboardResponse = {
     city: string;
     address: string;
     residenceMoveCount5y?: number | null;
-    employerCount5y?: number | null;
+    employmentType?: "EMPLOYED" | "SELF_EMPLOYED" | null;
+    employmentYears?: number | null;
     notes?: string | null;
     nin?: string | null;
     ninVerifiedAt?: string | null;
@@ -46,7 +47,9 @@ export type RenterDashboardResponse = {
       ruleId: string;
       code: string;
       name: string;
+      description?: string | null;
       points: number;
+      quantity: number;
       appliedOccurrences: number;
       contribution: number;
     }>;
@@ -208,7 +211,8 @@ export function updateRenterProfile(input: {
   city?: string;
   address?: string;
   residenceMoveCount5y?: number | null;
-  employerCount5y?: number | null;
+  employmentType?: "EMPLOYED" | "SELF_EMPLOYED" | null;
+  employmentYears?: number | null;
   notes?: string | null;
 }) {
   return apiFetch<RenterDashboardResponse>("/api/renter/profile", {

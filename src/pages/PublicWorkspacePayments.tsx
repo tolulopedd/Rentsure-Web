@@ -61,6 +61,10 @@ export default function PublicWorkspacePayments() {
   const [approvedQueue, setApprovedQueue] = useState<QueueListItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
+  const [selectedProof, setSelectedProof] = useState<{
+    url: string;
+    label: string;
+  } | null>(null);
   const [scheduleDateFilter, setScheduleDateFilter] = useState("");
   const [scheduleAmountFilter, setScheduleAmountFilter] = useState("");
   const [scheduleStatusFilter, setScheduleStatusFilter] = useState("ALL");
@@ -126,6 +130,7 @@ export default function PublicWorkspacePayments() {
 
   useEffect(() => {
     setShowScheduleForm(false);
+    setSelectedProof(null);
     setScheduleDateFilter("");
     setScheduleAmountFilter("");
     setScheduleStatusFilter("ALL");
@@ -391,6 +396,27 @@ export default function PublicWorkspacePayments() {
 
                 <div className="space-y-3">
                   <p className="text-sm font-semibold text-slate-950">Payment requests</p>
+                  {selectedProof ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-950">View proof</p>
+                          <p className="text-xs text-slate-500">{selectedProof.label}</p>
+                        </div>
+                        <Button type="button" variant="outline" onClick={() => setSelectedProof(null)}>
+                          <X className="mr-2 h-4 w-4" />
+                          Close
+                        </Button>
+                      </div>
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                        <iframe
+                          src={selectedProof.url}
+                          title={selectedProof.label}
+                          className="h-[70vh] min-h-[420px] w-full bg-white"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-2">
                       <Label>Due date</Label>
@@ -466,11 +492,19 @@ export default function PublicWorkspacePayments() {
                               </TableCell>
                               <TableCell>
                                 {schedule.paymentEvidenceViewUrl ? (
-                                  <Button asChild size="sm" variant="outline">
-                                    <a href={schedule.paymentEvidenceViewUrl} target="_blank" rel="noreferrer">
-                                      <ExternalLink className="mr-2 h-4 w-4" />
-                                      View proof
-                                    </a>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                      setSelectedProof({
+                                        url: schedule.paymentEvidenceViewUrl!,
+                                        label: `${schedule.paymentType.replaceAll("_", " ")} proof · ${formatDate(schedule.dueDate)}`
+                                      })
+                                    }
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    View proof
                                   </Button>
                                 ) : (
                                   <span className="text-sm text-slate-500">No proof</span>
