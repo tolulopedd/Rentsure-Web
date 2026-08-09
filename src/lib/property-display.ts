@@ -16,6 +16,11 @@ export function occupancyBadgeClass(isOccupied?: boolean | null) {
     : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-50";
 }
 
+export function availableForRentLabel(months?: number | null) {
+  if (!months || months < 1) return null;
+  return `Available in ${months} month${months === 1 ? "" : "s"}`;
+}
+
 export function propertyUnitStatusSummary(unit?: { label?: string | null; isOccupied?: boolean | null } | null) {
   if (!unit) return "-";
   return `${propertyUnitDisplayName(unit)} · ${occupancyLabel(unit.isOccupied)}`;

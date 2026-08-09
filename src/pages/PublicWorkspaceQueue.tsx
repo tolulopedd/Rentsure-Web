@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
-import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
+import { availableForRentLabel, occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   createWorkspaceProposedRenter,
   respondToLandlordReferenceRequest,
@@ -79,7 +79,6 @@ export default function PublicWorkspaceQueue() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
   const [searchResults, setSearchResults] = useState<WorkspaceRenterSearchResult[]>([]);
   const [selectedExistingRenter, setSelectedExistingRenter] = useState<WorkspaceRenterSearchResult | null>(null);
@@ -207,10 +206,11 @@ export default function PublicWorkspaceQueue() {
       }));
   }, [selectedProperty]);
 
+  const canSearchRenters = Boolean(properties.length && draft.propertyId && draft.propertyUnitId);
+
   function resetSearchFlow(nextPropertyId?: string) {
     const nextSelectedProperty = properties.find((property) => property.id === (nextPropertyId ?? draft.propertyId)) || null;
     setSearchQuery("");
-    setSearchLoading(false);
     setSearchPerformed(false);
     setSearchResults([]);
     setSelectedExistingRenter(null);
@@ -223,49 +223,60 @@ export default function PublicWorkspaceQueue() {
   }
 
   async function searchRenterDirectory() {
-    if (!draft.propertyId) {
-      toast.error("Select a property first.");
+    if (!canSearchRenters) {
       return;
     }
-    if (!draft.propertyUnitId) {
-      toast.error("Select a unit first.");
-      return;
-    }
-    if (searchQuery.trim().length < 2) {
-      toast.error("Enter at least two characters to search.");
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2) {
+      setSearchPerformed(false);
+      setSearchResults([]);
+      setSelectedExistingRenter(null);
       return;
     }
 
     try {
-      setSearchLoading(true);
       setSearchPerformed(true);
       setSelectedExistingRenter(null);
-      const response = await searchWorkspaceRenters(draft.propertyId, draft.propertyUnitId, searchQuery.trim());
+      const response = await searchWorkspaceRenters(draft.propertyId, draft.propertyUnitId, trimmedQuery);
       setSearchResults(response.items);
       if (!response.items.length) {
         setDraft((current) => ({
           ...current,
-          email: isValidEmail(searchQuery.trim()) ? searchQuery.trim() : current.email,
-          phone: /^\+?\d[\d\s-]{6,}$/.test(searchQuery.trim()) ? searchQuery.trim() : current.phone
+          email: isValidEmail(trimmedQuery) ? trimmedQuery : current.email,
+          phone: /^\+?\d[\d\s-]{6,}$/.test(trimmedQuery) ? trimmedQuery : current.phone
         }));
       }
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to search renters"));
-    } finally {
-      setSearchLoading(false);
     }
   }
 
   function useExistingRenter(result: WorkspaceRenterSearchResult) {
     setSelectedExistingRenter(result);
-    setDraft((current) => ({
-      ...current,
-      firstName: result.firstName,
-      lastName: result.lastName,
-      email: result.email,
-      phone: result.phone
-    }));
   }
+
+  useEffect(() => {
+    if (!canSearchRenters) {
+      setSearchPerformed(false);
+      setSearchResults([]);
+      setSelectedExistingRenter(null);
+      return;
+    }
+
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.length < 2) {
+      setSearchPerformed(false);
+      setSearchResults([]);
+      setSelectedExistingRenter(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void searchRenterDirectory();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [canSearchRenters, draft.propertyId, draft.propertyUnitId, searchQuery]);
 
   async function createProposedRenterEntry() {
     if (!draft.propertyId) {
@@ -278,23 +289,28 @@ export default function PublicWorkspaceQueue() {
     }
     const isExistingMember = Boolean(selectedExistingRenter);
 
-    if (!draft.firstName.trim()) {
+    const firstName = selectedExistingRenter?.firstName || draft.firstName;
+    const lastName = selectedExistingRenter?.lastName || draft.lastName;
+    const email = selectedExistingRenter?.email || draft.email;
+    const phone = selectedExistingRenter?.phone || draft.phone;
+
+    if (!firstName.trim()) {
       toast.error("Enter the renter first name.");
       return;
     }
-    if (!draft.lastName.trim()) {
+    if (!lastName.trim()) {
       toast.error("Enter the renter last name.");
       return;
     }
-    if (!draft.email.trim()) {
+    if (!email.trim()) {
       toast.error("Enter the renter email address.");
       return;
     }
-    if (!isValidEmail(draft.email)) {
+    if (!isValidEmail(email)) {
       toast.error("Enter a valid renter email address.");
       return;
     }
-    if (!draft.phone.trim()) {
+    if (!phone.trim()) {
       toast.error("Enter the renter phone number.");
       return;
     }
@@ -304,10 +320,10 @@ export default function PublicWorkspaceQueue() {
         propertyId: draft.propertyId,
         propertyUnitId: draft.propertyUnitId,
         renterAccountId: selectedExistingRenter?.id,
-        firstName: draft.firstName,
-        lastName: draft.lastName,
-        email: draft.email,
-        phone: draft.phone,
+        firstName,
+        lastName,
+        email,
+        phone,
         notes: draft.notes || undefined
       });
       setInvitePreviewUrl(response.invitePreviewUrl || null);
@@ -373,6 +389,7 @@ export default function PublicWorkspaceQueue() {
   }
 
   const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
+  const renterLinkAccepted = detail?.renterLinkResponseStatus === "ACCEPTED";
   const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
   const isApprovedTenant = detail?.decision?.decision === "APPROVED";
 
@@ -390,11 +407,7 @@ export default function PublicWorkspaceQueue() {
         </Button>
       </div>
 
-      {!properties.length ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          No property attached to this profile yet. Add a property before creating a proposed renter case.
-        </div>
-      ) : null}
+      {!properties.length ? <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">No property yet.</div> : null}
 
       {showLinkForm ? (
         <Card className="border-slate-200 shadow-sm">
@@ -468,11 +481,10 @@ export default function PublicWorkspaceQueue() {
                   className="bg-white"
                   disabled={!properties.length}
                 />
-                <Button variant="outline" onClick={() => void searchRenterDirectory()} disabled={!properties.length || searchLoading}>
-                  <Search className="mr-2 h-4 w-4" />
-                  {searchLoading ? "Searching..." : "Search"}
-                </Button>
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Start typing to see existing renter matches for this unit.
+              </p>
             </div>
 
             {searchPerformed && searchResults.length ? (
@@ -505,17 +517,6 @@ export default function PublicWorkspaceQueue() {
                     </div>
                   </button>
                 ))}
-              </div>
-            ) : null}
-
-            {selectedExistingRenter ? (
-              <div className="rounded-2xl border border-blue-200 bg-[var(--rentsure-blue-soft)]/40 p-3 md:p-4">
-                <p className="text-sm font-semibold text-slate-950">Selected renter</p>
-                <p className="mt-2 text-sm text-slate-700">{renterName(selectedExistingRenter)}</p>
-                <p className="text-sm text-slate-600">{selectedExistingRenter.email} · {selectedExistingRenter.phone}</p>
-                <p className="text-xs text-muted-foreground">
-                  {selectedExistingRenter.address}, {selectedExistingRenter.city}, {selectedExistingRenter.state}
-                </p>
               </div>
             ) : null}
 
@@ -552,11 +553,9 @@ export default function PublicWorkspaceQueue() {
             <CardTitle className="text-lg">Linked tenants</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading ? <p className="text-sm text-muted-foreground">Loading queue...</p> : null}
-            {!loading && !properties.length ? (
-              <p className="text-sm text-muted-foreground">No property attached to this profile yet.</p>
-            ) : null}
-            {!loading && properties.length && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters in the queue yet.</p> : null}
+            {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+            {!loading && !properties.length ? <p className="text-sm text-muted-foreground">No property yet.</p> : null}
+            {!loading && properties.length && !queue.length ? <p className="text-sm text-muted-foreground">No linked tenants yet.</p> : null}
             {!loading && queue.length ? (
               <div className="space-y-2">
                 <Label>Linked tenant</Label>
@@ -582,9 +581,9 @@ export default function PublicWorkspaceQueue() {
             <CardTitle className="text-lg">Property-tenant details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {detailLoading ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
-            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant to manage their record.</p> : null}
-            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading detail...</p> : null}
+            {detailLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
             {detail ? (
               <>
                   <div className="rounded-2xl border border-slate-200 bg-white">
@@ -636,9 +635,16 @@ export default function PublicWorkspaceQueue() {
                         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                           <span>{propertyUnitDisplayName(detail.propertyUnit)}</span>
                           {detail.propertyUnit ? (
-                            <Badge className={occupancyBadgeClass(detail.propertyUnit.isOccupied)} variant="outline">
-                              {occupancyLabel(detail.propertyUnit.isOccupied)}
-                            </Badge>
+                            <>
+                              <Badge className={occupancyBadgeClass(detail.propertyUnit.isOccupied)} variant="outline">
+                                {occupancyLabel(detail.propertyUnit.isOccupied)}
+                              </Badge>
+                              {detail.propertyUnit.isOccupied && detail.propertyUnit.availableForRentInMonths ? (
+                                <span className="text-xs text-slate-500">
+                                  {availableForRentLabel(detail.propertyUnit.availableForRentInMonths)}
+                                </span>
+                              ) : null}
+                            </>
                           ) : null}
                         </div>
                       </div>
@@ -646,15 +652,24 @@ export default function PublicWorkspaceQueue() {
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property address</p>
                         <p className="text-sm text-slate-600">{`${detail.property.address}, ${detail.property.city}, ${detail.property.state}`}</p>
                       </div>
+                      <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter link response</p>
+                        <div className="space-y-1 text-sm text-slate-600">
+                          <p>{detail.renterLinkResponseStatus.replaceAll("_", " ")}</p>
+                          {detail.renterLinkRespondedAt ? <p>Responded on {formatDate(detail.renterLinkRespondedAt)}</p> : null}
+                          {detail.renterLinkResponseNote ? <p>{detail.renterLinkResponseNote}</p> : null}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <Button onClick={() => void requestRentScore()} disabled={!canRequestScore} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
+                    <Button onClick={() => void requestRentScore()} disabled={!canRequestScore || !renterLinkAccepted} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
                       <ArrowRight className="mr-2 h-4 w-4" />
                       {requestButtonLabel}
                     </Button>
                   </div>
+                  {!renterLinkAccepted ? <p className="text-sm text-slate-500">The renter must accept the property link before you can request rent score.</p> : null}
 
                   {!isAgent && isApprovedTenant ? (
                     <div className="grid gap-4 xl:grid-cols-2">
@@ -704,9 +719,7 @@ export default function PublicWorkspaceQueue() {
                           <CardTitle className="text-base">Landlord reference requests</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 px-0 pb-0">
-                          {!detail.landlordReferenceRequests.length ? (
-                            <p className="text-sm text-muted-foreground">No landlord reference requests yet for this renter.</p>
-                          ) : null}
+                          {!detail.landlordReferenceRequests.length ? <p className="text-sm text-muted-foreground">No landlord reference requests yet.</p> : null}
                           {detail.landlordReferenceRequests.map((request) => (
                             <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3">
                               <div className="flex items-center justify-between gap-3">
@@ -777,7 +790,7 @@ export default function PublicWorkspaceQueue() {
                   {isApprovedTenant ? (
                     <div className="space-y-3">
                       <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
-                      {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
+                      {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No rent score requests yet.</p> : null}
                       {detail.scoreRequests.map((request) => (
                         <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
                           <div className="flex items-center justify-between gap-3">

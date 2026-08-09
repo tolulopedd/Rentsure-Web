@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { digitsOnly, formatNairaInput } from "@/lib/currency";
 import { getErrorMessage } from "@/lib/errors";
 import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { preparePassportPhotoUpload, uploadPublicAccountDocument } from "@/lib/upload";
@@ -23,6 +24,11 @@ type EvidencePayload = {
   mimeType: string;
   fileSize: number;
 };
+
+function parseCurrencyInput(value: string) {
+  const digits = digitsOnly(value);
+  return digits ? Number(digits) : 0;
+}
 
 export default function RenterWorkspacePayments() {
   const { data, initiateDirectPayment, initiateSchedulePaymentConfirmation } = useRenterWorkspace();
@@ -156,7 +162,7 @@ export default function RenterWorkspacePayments() {
       toast.error("Select a linked property first");
       return;
     }
-    if (!directPayment.amountNgn.trim() || Number(directPayment.amountNgn) <= 0) {
+    if (!directPayment.amountNgn.trim() || parseCurrencyInput(directPayment.amountNgn) <= 0) {
       toast.error("Enter a valid payment amount");
       return;
     }
@@ -169,7 +175,7 @@ export default function RenterWorkspacePayments() {
     const success = await initiateDirectPayment({
       linkedCaseId: directPayment.linkedCaseId,
       paymentType: directPayment.paymentType,
-      amountNgn: Number(directPayment.amountNgn),
+      amountNgn: parseCurrencyInput(directPayment.amountNgn),
       paidAt: directPayment.paidAt || undefined,
       receiptReference: directPayment.receiptReference || undefined,
       note: directPayment.note || undefined,
@@ -200,19 +206,11 @@ export default function RenterWorkspacePayments() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Payments</p>
             <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Payments and proof</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 md:mt-3">
-              Send your own payment proof to the landlord, or respond to landlord payment requests already linked to you.
-            </p>
           </div>
           <div className="flex flex-col items-start gap-2 md:items-end">
             <Button type="button" onClick={() => setShowDirectPaymentForm((current) => !current)} disabled={!canInitiatePayment}>
               {showDirectPaymentForm ? "Cancel" : canInitiatePayment ? "Initiate payment" : "Awaiting property link"}
             </Button>
-            {!canInitiatePayment ? (
-              <p className="max-w-xs text-xs leading-5 text-slate-500">
-                You can only make payments or upload proof for a property unit that has been linked and approved for you.
-              </p>
-            ) : null}
           </div>
         </div>
       </div>
@@ -223,17 +221,6 @@ export default function RenterWorkspacePayments() {
         <MetricCard label="Approved linked units" value={String(approvedLinkedCases.length)} icon={CreditCard} />
       </div>
 
-      {!canInitiatePayment ? (
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="space-y-2 p-4 md:p-5">
-            <p className="text-sm font-semibold text-slate-950">Proof of payment is still available</p>
-            <p className="text-sm leading-6 text-slate-600">
-              Once a landlord approves a linked property unit for you, you will be able to initiate a payment, upload your receipt or screenshot, and send it for review here.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
       {showDirectPaymentForm ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
@@ -241,7 +228,7 @@ export default function RenterWorkspacePayments() {
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {!canInitiatePayment ? (
-              <p className="text-sm text-muted-foreground">A landlord or agent needs to link a property to you before you can initiate a payment here.</p>
+              <p className="text-sm text-muted-foreground">No approved linked unit.</p>
             ) : (
               <>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -278,8 +265,8 @@ export default function RenterWorkspacePayments() {
                     label="Amount"
                     value={directPayment.amountNgn}
                     onChange={(value) => setDirectPayment((current) => ({ ...current, amountNgn: value }))}
-                    placeholder="Enter amount in naira"
-                    type="number"
+                    placeholder="₦1,200,000"
+                    type="currency"
                   />
                   <FormField
                     label="Payment date"
@@ -332,11 +319,11 @@ export default function RenterWorkspacePayments() {
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Payment requests</CardTitle>
+            <CardTitle className="text-lg">Payment requests and reviews</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {!pendingApprovedSchedules.length ? (
-              <p className="text-sm text-muted-foreground">No landlord payment requests are waiting right now.</p>
+              <p className="text-sm text-muted-foreground">No payment requests or pending reviews right now.</p>
             ) : null}
             {pendingApprovedSchedules.map((schedule) => {
               const proofLocked = Boolean(schedule.confirmationInitiatedAt);
@@ -397,8 +384,16 @@ export default function RenterWorkspacePayments() {
                   />
                   {evidenceById[schedule.id] ? <p className="text-xs text-slate-500">Uploaded: {evidenceById[schedule.id]?.fileName}</p> : null}
                   {schedule.paymentEvidenceFileName ? <p className="text-xs text-slate-500">Current evidence: {schedule.paymentEvidenceFileName}</p> : null}
+                  {schedule.confirmationOutcome === "PARTIAL" ? (
+                    <p className="text-xs text-amber-700">
+                      Landlord marked this payment as partial. If you need to send the balance, initiate a new payment.
+                    </p>
+                  ) : null}
                   {schedule.confirmationInitiatedAt ? (
-                    <p className="text-xs text-amber-700">Proof sent on {formatDate(schedule.confirmationInitiatedAt)}. Awaiting landlord confirmation.</p>
+                    <p className="text-xs text-amber-700">
+                      Proof sent on {formatDate(schedule.confirmationInitiatedAt)}.
+                      {schedule.confirmationOutcome === "PARTIAL" ? " Review completed." : " Awaiting landlord confirmation."}
+                    </p>
                   ) : null}
                   {proofLocked ? (
                     <p className="text-xs text-slate-500">
@@ -451,6 +446,9 @@ export default function RenterWorkspacePayments() {
                   </div>
                 </div>
                 {schedule.receiptReference ? <p className="mt-3 text-xs text-slate-500">Receipt reference: {schedule.receiptReference}</p> : null}
+                {schedule.confirmationOutcome === "PARTIAL" ? (
+                  <p className="mt-1 text-xs text-slate-500">Review outcome: Partial</p>
+                ) : null}
                 {schedule.confirmationTiming ? (
                   <p className="mt-1 text-xs text-slate-500">Timing: {schedule.confirmationTiming === "ON_TIME" ? "On time" : "Late"}</p>
                 ) : null}
@@ -497,19 +495,22 @@ function FormField({
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
-  type?: "text" | "number" | "date";
+  type?: "text" | "number" | "date" | "currency";
   disabled?: boolean;
 }) {
+  const isCurrency = type === "currency";
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
       <Input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+        type={isCurrency ? "text" : type}
+        value={isCurrency ? formatNairaInput(value) : value}
+        onChange={(event) => onChange(isCurrency ? digitsOnly(event.target.value) : event.target.value)}
         placeholder={placeholder}
         className="bg-white"
         disabled={disabled}
+        inputMode={isCurrency ? "numeric" : undefined}
       />
     </div>
   );

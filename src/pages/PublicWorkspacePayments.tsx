@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { digitsOnly, formatNairaInput } from "@/lib/currency";
 import { getErrorMessage } from "@/lib/errors";
 import { occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
@@ -16,6 +17,7 @@ import {
   createWorkspacePaymentSchedule,
   getWorkspaceQueueItem,
   listWorkspaceQueue,
+  type PaymentConfirmationOutcome,
   type PaymentScheduleType,
   type QueueDetail,
   type QueueListItem
@@ -51,6 +53,11 @@ function formatDate(value?: string | null) {
 
 function formatNgn(value: number) {
   return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
+}
+
+function parseCurrencyInput(value: string) {
+  const digits = digitsOnly(value);
+  return digits ? Number(digits) : 0;
 }
 
 function renterName(item: { firstName: string; lastName: string; organizationName?: string | null }) {
@@ -156,7 +163,7 @@ export default function PublicWorkspacePayments() {
     try {
       await createWorkspacePaymentSchedule(detail.id, {
         paymentType: scheduleDraft.paymentType,
-        amountNgn: Number(scheduleDraft.amountNgn),
+        amountNgn: parseCurrencyInput(scheduleDraft.amountNgn),
         dueDate: scheduleDraft.dueDate,
         note: scheduleDraft.note || undefined,
         recurrence: scheduleDraft.recurrenceEnabled
@@ -177,13 +184,13 @@ export default function PublicWorkspacePayments() {
     }
   }
 
-  async function confirmSchedule(paymentScheduleId: string) {
+  async function confirmSchedule(paymentScheduleId: string, outcome: PaymentConfirmationOutcome) {
     if (!detail) return;
     try {
-      await confirmWorkspacePaymentSchedule(paymentScheduleId);
+      await confirmWorkspacePaymentSchedule(paymentScheduleId, { outcome });
       await loadQueue(detail.id);
       await loadDetail(detail.id);
-      toast.success("Payment confirmed");
+      toast.success(outcome === "FULL" ? "Payment confirmed in full" : "Payment marked partial");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to confirm payment"));
     }
@@ -232,8 +239,8 @@ export default function PublicWorkspacePayments() {
           <CardTitle className="text-lg">Tenants</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading ? <p className="text-sm text-muted-foreground">Loading payment cases...</p> : null}
-          {!loading && !approvedQueue.length ? <p className="text-sm text-muted-foreground">No approved renters are available for payment scheduling yet.</p> : null}
+          {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+          {!loading && !approvedQueue.length ? <p className="text-sm text-muted-foreground">No approved renters yet.</p> : null}
           {!loading && approvedQueue.length ? (
             <div className="space-y-2">
               <Label>Tenant</Label>
@@ -259,9 +266,9 @@ export default function PublicWorkspacePayments() {
             <CardTitle className="text-lg">Payment schedules</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {detailLoading ? <p className="text-sm text-muted-foreground">Loading payment detail...</p> : null}
-            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a tenant to manage payments.</p> : null}
-            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading payment detail...</p> : null}
+            {detailLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a tenant.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
             {detail ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
@@ -320,7 +327,15 @@ export default function PublicWorkspacePayments() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label>Amount (NGN)</Label>
-                          <Input value={scheduleDraft.amountNgn} onChange={(event) => setScheduleDraft((current) => ({ ...current, amountNgn: event.target.value }))} className="bg-white" />
+                          <Input
+                            value={formatNairaInput(scheduleDraft.amountNgn)}
+                            onChange={(event) =>
+                              setScheduleDraft((current) => ({ ...current, amountNgn: digitsOnly(event.target.value) }))
+                            }
+                            className="bg-white"
+                            inputMode="numeric"
+                            placeholder="₦1,200,000"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>Due date</Label>
@@ -461,9 +476,9 @@ export default function PublicWorkspacePayments() {
                     </div>
                   </div>
 
-                  {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules logged yet.</p> : null}
+                  {!detail.paymentSchedules.length ? <p className="text-sm text-muted-foreground">No payment schedules yet.</p> : null}
                   {detail.paymentSchedules.length && !filteredSchedules.length ? (
-                    <p className="text-sm text-muted-foreground">No payment schedules match the current filters.</p>
+                    <p className="text-sm text-muted-foreground">No matching payment schedules.</p>
                   ) : null}
 
                   {filteredSchedules.length ? (
@@ -488,7 +503,13 @@ export default function PublicWorkspacePayments() {
                               <TableCell>{formatDate(schedule.dueDate)}</TableCell>
                               <TableCell>{schedule.status}</TableCell>
                               <TableCell>
-                                {schedule.confirmationTiming ? (schedule.confirmationTiming === "ON_TIME" ? "On time" : "Late") : "Awaiting proof"}
+                                {schedule.confirmationOutcome === "PARTIAL"
+                                  ? "Partial"
+                                  : schedule.confirmationTiming
+                                    ? schedule.confirmationTiming === "ON_TIME"
+                                      ? "On time"
+                                      : "Late"
+                                    : "Awaiting proof"}
                               </TableCell>
                               <TableCell>
                                 {schedule.paymentEvidenceViewUrl ? (
@@ -511,16 +532,28 @@ export default function PublicWorkspacePayments() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {schedule.status !== "PAID" ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => void confirmSchedule(schedule.id)}
-                                    disabled={!schedule.confirmationInitiatedAt}
-                                  >
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    Confirm
-                                  </Button>
+                                {schedule.confirmationOutcome === "PARTIAL" ? (
+                                  <span className="text-sm text-amber-700">Marked partial</span>
+                                ) : schedule.status !== "PAID" ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => void confirmSchedule(schedule.id, "FULL")}
+                                      disabled={!schedule.confirmationInitiatedAt}
+                                    >
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Confirm full
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => void confirmSchedule(schedule.id, "PARTIAL")}
+                                      disabled={!schedule.confirmationInitiatedAt}
+                                    >
+                                      Mark partial
+                                    </Button>
+                                  </div>
                                 ) : (
                                   <div className="flex items-center gap-2 text-sm text-emerald-700">
                                     <Clock3 className="h-4 w-4" />

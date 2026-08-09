@@ -33,6 +33,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const adminItems = [
     { label: "Dashboard", to: "/app/dashboard", icon: LayoutDashboard },
     { label: "Unregistered Requests", to: "/app/unregistered-requests", icon: ClipboardList },
+    { label: "Identity Reviews", to: "/app/identity-reviews", icon: ClipboardList },
     { label: "Renter Activities", to: "/app/renter-activities", icon: Users },
     { label: "Landlord & Agent Activities", to: "/app/landlord-agent-activities", icon: Building2 },
     { label: "Renter Scores", to: "/app/renters", icon: Users },

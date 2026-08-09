@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { digitsOnly, formatNairaInput } from "@/lib/currency";
 import { getErrorMessage } from "@/lib/errors";
 import {
   addressSearchMatches,
@@ -14,15 +15,17 @@ import {
   formatNigeriaFallbackAddress,
   NIGERIA_ADDRESS_PLACEHOLDER
 } from "@/lib/nigeria-address";
-import { occupancyBadgeClass, occupancyLabel } from "@/lib/property-display";
+import { availableForRentLabel, occupancyBadgeClass, occupancyLabel } from "@/lib/property-display";
 import { searchMapboxSuggestions, type MapboxSearchSuggestion } from "@/lib/mapbox-search";
 import { fallbackNigeriaAddressSuggestions, nigerianStates, nigeriaStateCityMap } from "@/lib/nigeria-locations";
 import {
   createWorkspaceProperty,
   listWorkspaceProperties,
+  respondToWorkspaceAgentInvite,
   searchWorkspaceAgents,
   shareWorkspaceProperty,
   updateWorkspaceProperty,
+  type PendingWorkspaceAgentInvite,
   type WorkspaceAgentSearchResult,
   type WorkspaceProperty
 } from "@/lib/public-workspace-api";
@@ -43,6 +46,7 @@ type PropertyDraft = {
     bathroomCount: number;
     annualRentAmountNgn: string;
     isOccupied: boolean;
+    availableForRentInMonths: string;
     currentTenantName: string;
     currentTenantEmail: string;
     currentTenantPhone: string;
@@ -50,6 +54,28 @@ type PropertyDraft = {
 };
 
 const propertyTypeOptions: PropertyType[] = ["Duplex", "Flats", "Self Contain", "Mansion", "Boys Quater"];
+
+function rentBandFromAnnualRent(value: string) {
+  const amount = Number(digitsOnly(value));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return {
+      code: "-",
+      label: "Set annual rent to preview band",
+      range: ""
+    };
+  }
+
+  if (amount < 500_000) {
+    return { code: "D", label: "Band D", range: "Below ₦500,000" };
+  }
+  if (amount <= 1_000_000) {
+    return { code: "C", label: "Band C", range: "₦500,000 - ₦1,000,000" };
+  }
+  if (amount <= 2_500_000) {
+    return { code: "B", label: "Band B", range: "₦1,000,001 - ₦2,500,000" };
+  }
+  return { code: "A", label: "Band A", range: "Above ₦2,500,000" };
+}
 
 function createInitialDraft(): PropertyDraft {
   const rawRole = (localStorage.getItem("userRole") || "LANDLORD").toUpperCase();
@@ -71,6 +97,7 @@ function createInitialDraft(): PropertyDraft {
         bathroomCount: 2,
         annualRentAmountNgn: "",
         isOccupied: false,
+        availableForRentInMonths: "",
         currentTenantName: "",
         currentTenantEmail: "",
         currentTenantPhone: ""
@@ -81,6 +108,7 @@ function createInitialDraft(): PropertyDraft {
 
 export default function PublicWorkspaceProperties() {
   const [items, setItems] = useState<WorkspaceProperty[]>([]);
+  const [pendingAgentInvites, setPendingAgentInvites] = useState<PendingWorkspaceAgentInvite[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
   const [draft, setDraft] = useState<PropertyDraft>(() => createInitialDraft());
   const [shareEmailById, setShareEmailById] = useState<Record<string, string>>({});
@@ -89,6 +117,7 @@ export default function PublicWorkspaceProperties() {
   const [shareOpenById, setShareOpenById] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [respondingInviteId, setRespondingInviteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null);
@@ -113,6 +142,7 @@ export default function PublicWorkspaceProperties() {
       setError(null);
       const response = await listWorkspaceProperties();
       setItems(response.items);
+      setPendingAgentInvites(response.pendingAgentInvites);
       setSelectedPropertyId((current) =>
         preferredPropertyId && response.items.some((item) => item.id === preferredPropertyId)
           ? preferredPropertyId
@@ -169,6 +199,7 @@ export default function PublicWorkspaceProperties() {
             bathroomCount: unit.bathroomCount,
             annualRentAmountNgn: unit.annualRentAmountNgn == null ? "" : String(unit.annualRentAmountNgn),
             isOccupied: unit.isOccupied,
+            availableForRentInMonths: unit.availableForRentInMonths == null ? "" : String(unit.availableForRentInMonths),
             currentTenantName: unit.currentTenantName || "",
             currentTenantEmail: unit.currentTenantEmail || "",
             currentTenantPhone: unit.currentTenantPhone || ""
@@ -417,6 +448,7 @@ export default function PublicWorkspaceProperties() {
           bathroomCount: 1,
           annualRentAmountNgn: "",
           isOccupied: false,
+          availableForRentInMonths: "",
           currentTenantName: "",
           currentTenantEmail: "",
           currentTenantPhone: ""
@@ -452,6 +484,16 @@ export default function PublicWorkspaceProperties() {
     if (draft.units.some((unit) => unit.isOccupied && !unit.currentTenantPhone.trim())) {
       return "Enter the current tenant phone number for each occupied unit.";
     }
+    if (
+      draft.units.some(
+        (unit) =>
+          unit.isOccupied &&
+          unit.availableForRentInMonths.trim() &&
+          (!Number.isFinite(Number(unit.availableForRentInMonths)) || Number(unit.availableForRentInMonths) < 1)
+      )
+    ) {
+      return "Enter a valid future availability in months for occupied units.";
+    }
 
     return null;
   }
@@ -481,6 +523,8 @@ export default function PublicWorkspaceProperties() {
           bathroomCount: unit.bathroomCount,
           annualRentAmountNgn: unit.annualRentAmountNgn.trim() ? Number(unit.annualRentAmountNgn) : null,
           isOccupied: unit.isOccupied,
+          availableForRentInMonths:
+            unit.isOccupied && unit.availableForRentInMonths.trim() ? Number(unit.availableForRentInMonths) : null,
           currentTenantName: unit.isOccupied ? unit.currentTenantName.trim() : undefined,
           currentTenantEmail: unit.isOccupied ? unit.currentTenantEmail.trim() : undefined,
           currentTenantPhone: unit.isOccupied ? unit.currentTenantPhone.trim() : undefined
@@ -513,12 +557,29 @@ export default function PublicWorkspaceProperties() {
     }
 
     try {
-      await shareWorkspaceProperty(propertyId, email);
+      const response = await shareWorkspaceProperty(propertyId, email);
       await loadProperties(propertyId);
       setShareEmailById((current) => ({ ...current, [propertyId]: "" }));
-      toast.success("Property shared with agent");
+      if (response.mode === "INVITE_SENT") {
+        toast.success("Agent invite sent");
+      } else {
+        toast.success("This property is already accepted by that agent");
+      }
     } catch (shareError: unknown) {
       toast.error(getErrorMessage(shareError, "Failed to share property"));
+    }
+  }
+
+  async function respondToAgentInvite(inviteId: string, action: "ACCEPT" | "DECLINE") {
+    try {
+      setRespondingInviteId(inviteId);
+      await respondToWorkspaceAgentInvite(inviteId, action);
+      await loadProperties();
+      toast.success(action === "ACCEPT" ? "Property accepted" : "Property declined");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to update property invite"));
+    } finally {
+      setRespondingInviteId(null);
     }
   }
 
@@ -575,11 +636,6 @@ export default function PublicWorkspaceProperties() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Properties</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {isLandlord
-              ? "Manage your properties and units."
-              : "View properties shared with you."}
-          </p>
         </div>
 
         {isLandlord ? (
@@ -595,7 +651,7 @@ export default function PublicWorkspaceProperties() {
             className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
           >
             {showAddForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-            {showAddForm ? "Close form" : "Add property"}
+            {showAddForm ? "Close form" : "Link property"}
           </Button>
         ) : null}
       </div>
@@ -603,8 +659,7 @@ export default function PublicWorkspaceProperties() {
       {showAddForm && isLandlord ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Add property"}</CardTitle>
-            <p className="text-sm text-muted-foreground">Add one property and its units.</p>
+            <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Link property"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -612,7 +667,7 @@ export default function PublicWorkspaceProperties() {
                 label="Property description"
                 value={draft.name}
                 onChange={(value) => setDraft((current) => ({ ...current, name: value }))}
-                placeholder="4 Units of Flats at Forthright Estate"
+                placeholder="Block of Flats @ Ikeja"
               />
               <div className="space-y-2">
                 <Label>Property type</Label>
@@ -859,11 +914,26 @@ export default function PublicWorkspaceProperties() {
                             )
                           }))
                         }
-                        placeholder="e.g. 1200000"
+                        placeholder="₦1,200,000"
                       />
                       <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-600">
-                        <p className="font-medium text-slate-950">Rent band input</p>
-                        <p className="mt-1">Used to calculate renter band.</p>
+                        {(() => {
+                          const band = rentBandFromAnnualRent(unit.annualRentAmountNgn);
+                          return (
+                            <>
+                              <p className="font-medium text-slate-950">Band preview</p>
+                              <div className="mt-2 flex items-center gap-2">
+                                <span className="inline-flex min-w-9 items-center justify-center rounded-full border border-[var(--rentsure-blue-soft)] bg-[var(--rentsure-blue-soft)] px-3 py-1 text-xs font-semibold text-[var(--rentsure-blue)]">
+                                  {band.code}
+                                </span>
+                                <span className="text-sm font-medium text-slate-950">{band.label}</span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-500">
+                                {band.range || "The band is derived automatically from the annual rent amount."}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -880,6 +950,7 @@ export default function PublicWorkspaceProperties() {
                                   ? {
                                       ...entry,
                                       isOccupied: value === "OCCUPIED",
+                                      availableForRentInMonths: value === "OCCUPIED" ? entry.availableForRentInMonths : "",
                                       currentTenantName: value === "OCCUPIED" ? entry.currentTenantName : "",
                                       currentTenantEmail: value === "OCCUPIED" ? entry.currentTenantEmail : "",
                                       currentTenantPhone: value === "OCCUPIED" ? entry.currentTenantPhone : ""
@@ -900,7 +971,19 @@ export default function PublicWorkspaceProperties() {
                       </div>
 
                       {unit.isOccupied ? (
-                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-3 md:p-4 sm:grid-cols-3">
+                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-3 md:p-4 sm:grid-cols-2 lg:grid-cols-4">
+                          <NumberField
+                            label="Available in months"
+                            value={Math.max(1, Number(unit.availableForRentInMonths || 1))}
+                            onChange={(value) =>
+                              setDraft((current) => ({
+                                ...current,
+                                units: current.units.map((entry, unitIndex) =>
+                                  unitIndex === index ? { ...entry, availableForRentInMonths: String(value) } : entry
+                                )
+                              }))
+                            }
+                          />
                           <TextField
                             label="Current tenant name"
                             value={unit.currentTenantName}
@@ -960,6 +1043,48 @@ export default function PublicWorkspaceProperties() {
                 Cancel
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!isLandlord && pendingAgentInvites.length ? (
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Pending property invites</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pendingAgentInvites.map((invite) => (
+              <div key={invite.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-slate-950">{invite.property.summaryLabel}</p>
+                    <p className="text-sm text-slate-600">{invite.property.address}</p>
+                    <p className="text-sm text-slate-500">
+                      {invite.property.city}, {invite.property.state}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      Shared by {invite.invitedBy.name}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      onClick={() => void respondToAgentInvite(invite.id, "ACCEPT")}
+                      disabled={respondingInviteId === invite.id}
+                      className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => void respondToAgentInvite(invite.id, "DECLINE")}
+                      disabled={respondingInviteId === invite.id}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       ) : null}
@@ -1033,9 +1158,14 @@ export default function PublicWorkspaceProperties() {
                           {selectedProperty.propertyType || "Property"} · {unit.bedroomCount} rooms · {unit.bathroomCount} baths
                         </td>
                         <td className="py-3 pr-4">
-                          <Badge className={occupancyBadgeClass(unit.isOccupied)} variant="outline">
-                            {occupancyLabel(unit.isOccupied)}
-                          </Badge>
+                          <div className="space-y-1">
+                            <Badge className={occupancyBadgeClass(unit.isOccupied)} variant="outline">
+                              {occupancyLabel(unit.isOccupied)}
+                            </Badge>
+                            {unit.isOccupied && unit.availableForRentInMonths ? (
+                              <p className="text-xs text-slate-500">{availableForRentLabel(unit.availableForRentInMonths)}</p>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="py-3 pr-4 text-slate-600">
                           {unit.annualRentAmountNgn == null ? "Not set" : formatNgn(unit.annualRentAmountNgn)}
@@ -1062,6 +1192,16 @@ export default function PublicWorkspaceProperties() {
                   <div className="space-y-2 text-sm text-slate-600">
                     <RowLabel label="Owner" value={selectedProperty.ownerName} />
                     <RowLabel label="Landlord email" value={selectedProperty.landlordEmail} />
+                    {selectedProperty.agentAssignment ? (
+                      <RowLabel
+                        label={selectedProperty.agentAssignment.status === "ACCEPTED" ? "Agent" : "Agent invite"}
+                        value={
+                          selectedProperty.agentAssignment.name
+                            ? `${selectedProperty.agentAssignment.name} (${selectedProperty.agentAssignment.email})`
+                            : selectedProperty.agentAssignment.email
+                        }
+                      />
+                    ) : null}
                   </div>
 
                   {isLandlord ? (
@@ -1086,8 +1226,13 @@ export default function PublicWorkspaceProperties() {
                               setShareOpenById((current) => ({ ...current, [selectedProperty.id]: true }));
                             }
                           }}
-                          placeholder="Search agent email"
+                          placeholder={
+                            selectedProperty.agentAssignment?.status === "ACCEPTED"
+                              ? "This property is already assigned to an agent"
+                              : "Search agent email"
+                          }
                           className="bg-white"
+                          disabled={selectedProperty.agentAssignment?.status === "ACCEPTED"}
                         />
                         {shareOpenById[selectedProperty.id] &&
                         (shareLookupLoadingById[selectedProperty.id] || (shareSuggestionsById[selectedProperty.id] || []).length > 0) ? (
@@ -1109,7 +1254,11 @@ export default function PublicWorkspaceProperties() {
                           </LovPanel>
                         ) : null}
                       </div>
-                      <Button variant="outline" onClick={() => void shareProperty(selectedProperty.id)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => void shareProperty(selectedProperty.id)}
+                        disabled={selectedProperty.agentAssignment?.status === "ACCEPTED"}
+                      >
                         Share with Agent
                       </Button>
                     </div>
@@ -1205,12 +1354,15 @@ function CurrencyField({
   onChange: (value: string) => void;
   placeholder?: string;
 }) {
+  const numericValue = digitsOnly(value);
+  const displayValue = formatNairaInput(numericValue);
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
       <Input
-        value={value}
-        onChange={(event) => onChange(event.target.value.replace(/[^\d]/g, ""))}
+        value={displayValue}
+        onChange={(event) => onChange(digitsOnly(event.target.value))}
         className="bg-white"
         inputMode="numeric"
         placeholder={placeholder}

@@ -256,12 +256,12 @@ export default function Landing() {
           <Button asChild variant="ghost" className="text-slate-700 hover:bg-white/70 hover:text-slate-950">
             <Link to="/login">Sign in</Link>
           </Button>
-          <Button
-            asChild
-            className="rounded-full bg-[var(--rentsure-blue)] px-5 text-white shadow-lg shadow-[rgba(18,0,255,0.2)] hover:bg-[var(--rentsure-blue-deep)] focus-visible:ring-[var(--rentsure-blue)]"
-          >
-            <Link to="/signup">Get started</Link>
-          </Button>
+            <Button
+              asChild
+              className="rounded-full bg-[var(--rentsure-blue)] px-5 text-white shadow-lg shadow-[rgba(18,0,255,0.2)] hover:bg-[var(--rentsure-blue-deep)] focus-visible:ring-[var(--rentsure-blue)]"
+            >
+              <Link to="/signup">Get started</Link>
+            </Button>
         </div>
       </header>
 
@@ -450,9 +450,9 @@ export default function Landing() {
                     <div className="mt-8 space-y-4">
                       {item.bullets.map((bullet) => (
                         <div key={bullet} className="flex items-start gap-3">
-                          <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
-                            <CircleCheckBig className="h-4 w-4" />
-                          </div>
+                      <div className="mt-1 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]">
+                        <CircleCheckBig className="h-4 w-4" />
+                      </div>
                           <p className="text-sm leading-6 text-slate-700">{bullet}</p>
                         </div>
                       ))}
@@ -519,7 +519,9 @@ export default function Landing() {
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="mt-4 text-lg font-semibold">{signal.label}</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-300">{signal.description}</div>
+                      <div className="mt-2 text-sm leading-6 text-slate-300">
+                        {signal.description}
+                      </div>
                     </div>
                   );
                 })}
@@ -656,7 +658,7 @@ export default function Landing() {
               <div>
                 <BrandLogo size="sm" />
                 <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
-                  RentSure helps tenants build trust early and helps landlords or agents make rental decisions with more confidence.
+              RentSure helps tenants build trust early and helps landlords or agents make rental decisions with more confidence.
                 </p>
                 <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--rentsure-blue)]/10 bg-[var(--rentsure-blue-soft)]/50 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-[var(--rentsure-blue)]">
                   <span className="h-2 w-2 rounded-full bg-[var(--rentsure-blue)]" />

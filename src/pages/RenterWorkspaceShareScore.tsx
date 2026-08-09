@@ -229,12 +229,7 @@ export default function RenterWorkspaceShareScore() {
     <div className="space-y-6">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.16),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-6 shadow-sm">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Share score</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Share your rent score report with a landlord or agent</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          {linkedCase
-            ? "This share is tied to a landlord decision request so the correct property contact receives your rent score."
-            : "Use this page to search, share, and keep a clean record of who has received your current rent score report."}
-        </p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Share your rent score</h1>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">

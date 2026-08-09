@@ -17,3 +17,14 @@ export function formatNaira(value: AmountInput, fallback = "—") {
   if (parsed === null) return fallback;
   return `₦ ${nairaFormatter.format(parsed)}`;
 }
+
+export function digitsOnly(value: string) {
+  return value.replace(/[^\d]/g, "");
+}
+
+export function formatNairaInput(value: string, fallback = "") {
+  const digits = digitsOnly(value);
+  if (!digits) return fallback;
+  const normalized = digits.replace(/^0+/, "") || "0";
+  return `₦${Number(normalized).toLocaleString("en-NG")}`;
+}

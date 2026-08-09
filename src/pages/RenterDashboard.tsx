@@ -15,8 +15,8 @@ import { rentScoreDriverDetail } from "@/lib/renter-workspace-presenters";
 import {
   confirmRenterPayment,
   getRenterDashboard,
+  submitRenterIdentityForReview,
   updateRenterProfile,
-  verifyRenterIdentity,
   type RenterDashboardResponse
 } from "@/lib/renter-api";
 import { useNavigate } from "react-router-dom";
@@ -136,14 +136,14 @@ export default function RenterDashboard() {
   async function verifyIdentity(type: "NIN" | "BVN") {
     try {
       setIdentitySaving(type);
-      const response = await verifyRenterIdentity({
+      const response = await submitRenterIdentityForReview({
         verificationType: type,
         value: type === "NIN" ? nin : bvn
       });
       setData(response);
-      toast.success(`${type} verified`);
+      toast.success(`${type} submitted for review`);
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, `Failed to verify ${type}`));
+      toast.error(getErrorMessage(error, `Failed to submit ${type}`));
     } finally {
       setIdentitySaving(null);
     }

@@ -68,6 +68,8 @@ export default function Signup() {
   const [resending, setResending] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [signupResult, setSignupResult] = useState<SignupResponse | null>(null);
+  const invitedTrack = searchParams.get("track")?.trim().toUpperCase() === "AGENT" ? "AGENT" : null;
+  const invitedEmail = searchParams.get("email")?.trim() || "";
 
   usePageSeo({
     title: "RentSure | Signup",
@@ -161,7 +163,9 @@ export default function Signup() {
           <CardHeader className="space-y-3">
             <CardTitle className="text-center text-xl">Start with your basic details</CardTitle>
             <p className="text-center text-sm text-slate-500">
-              We will send a verification link to your email.
+              {invitedTrack === "AGENT"
+                ? "You were invited as an agent. Complete your basic details to continue."
+                : "We will send a verification link to your email."}
             </p>
           </CardHeader>
 
@@ -219,7 +223,11 @@ export default function Signup() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Account type</Label>
-                    <Select value={form.track} onValueChange={(value) => update("track", value as SignupTrack)}>
+                    <Select
+                      value={form.track}
+                      onValueChange={(value) => update("track", value as SignupTrack)}
+                      disabled={invitedTrack === "AGENT"}
+                    >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select account type" />
                       </SelectTrigger>
@@ -251,9 +259,12 @@ export default function Signup() {
                     type="email"
                     value={form.email}
                     onChange={(event) => update("email", event.target.value)}
-                    placeholder="Enter email address"
+                    placeholder={invitedEmail ? invitedEmail : "Enter email address"}
                     autoComplete="email"
                   />
+                  {invitedTrack === "AGENT" ? (
+                    <p className="text-xs text-slate-500">Use the invited email so the landlord can link this agent profile automatically.</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">

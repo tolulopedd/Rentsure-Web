@@ -15,6 +15,7 @@ export function getRenterOnboarding(profile: {
   state?: string | null;
   city?: string | null;
   address?: string | null;
+  identityReviewStatus?: "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "FAILED";
   ninVerifiedAt?: string | null;
   bvnVerifiedAt?: string | null;
   passportPhoto?: { id: string } | null;
@@ -30,11 +31,11 @@ export function getRenterOnboarding(profile: {
     },
     {
       id: "identity",
-      title: "Validate your identity",
-      description: "Verify your NIN or BVN so your rent score can move with confidence.",
-      done: Boolean(profile.ninVerifiedAt || profile.bvnVerifiedAt),
+      title: "Submit identity for review",
+      description: "Submit your NIN or BVN so RentSure can review and approve it.",
+      done: profile.identityReviewStatus === "APPROVED",
       href: "/account/renter/profile",
-      actionLabel: "Validate identity"
+      actionLabel: "Submit identity"
     },
     {
       id: "photo",
@@ -84,11 +85,14 @@ export function getWorkspaceOnboarding(input: {
   const steps: StepStatus[] = [
     {
       id: "role",
-      title: "Confirm your landlord or agent setup",
-      description: "Choose how this profile operates on RentSure before you start working with renters.",
+      title: input.accountType === "LANDLORD" ? "Confirm your landlord setup" : "Confirm your agent setup",
+      description:
+        input.accountType === "LANDLORD"
+          ? "Set how this landlord profile operates on RentSure."
+          : "Set how this agent profile operates on RentSure.",
       done: Boolean(input.representation),
       href: "/account/profile?onboarding=1",
-      actionLabel: "Confirm role"
+      actionLabel: "Confirm setup"
     },
     {
       id: "contact",
@@ -105,16 +109,19 @@ export function getWorkspaceOnboarding(input: {
       done: Boolean(input.passportPhoto?.id),
       href: "/account/profile?onboarding=1",
       actionLabel: "Upload picture"
-    },
-    {
+    }
+  ];
+
+  if (input.accountType === "LANDLORD") {
+    steps.push({
       id: "property",
       title: "Add your first property",
-      description: "Link at least one property before creating proposed renter records.",
+      description: "Link at least one property before creating renter records.",
       done: Boolean((input.propertyCount || 0) > 0),
       href: "/account/properties",
       actionLabel: "Add property"
-    }
-  ];
+    });
+  }
 
   if (input.entityType === "COMPANY") {
     steps.splice(2, 0, {

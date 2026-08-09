@@ -7,10 +7,11 @@ import {
   getRenterDashboard,
   initiateRenterPaymentConfirmation,
   requestLandlordReference as requestLandlordReferenceApi,
+  respondToLinkedProperty as respondToLinkedPropertyApi,
   saveRenterPassportPhoto,
   shareRenterScoreReport,
+  submitRenterIdentityForReview,
   updateRenterProfile,
-  verifyRenterIdentity,
   type RenterDashboardResponse
 } from "@/lib/renter-api";
 import { getErrorMessage } from "@/lib/errors";
@@ -80,6 +81,7 @@ type RenterWorkspaceContextValue = {
     note?: string;
   }) => Promise<{ success: boolean; previewUrl?: string | null }>;
   acceptScoreRequest: (linkedCaseId: string) => Promise<boolean>;
+  respondToLinkedProperty: (linkedCaseId: string, action: "ACCEPT" | "WITHDRAW", note?: string) => Promise<boolean>;
   requestLandlordReference: (linkedCaseId: string, note?: string) => Promise<boolean>;
   savePassportPhoto: (input: {
     objectKey: string;
@@ -180,12 +182,12 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
 
   async function verifyIdentityValue(input: { verificationType: "NIN" | "BVN"; value: string }) {
     try {
-      const response = await verifyRenterIdentity(input);
+      const response = await submitRenterIdentityForReview(input);
       setData(response);
-      toast.success(`${input.verificationType} verified`);
+      toast.success(`${input.verificationType} submitted for review`);
       return true;
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, `Failed to verify ${input.verificationType}`));
+      toast.error(getErrorMessage(error, `Failed to submit ${input.verificationType}`));
       return false;
     }
   }
@@ -296,6 +298,18 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function respondToLinkedProperty(linkedCaseId: string, action: "ACCEPT" | "WITHDRAW", note?: string) {
+    try {
+      const response = await respondToLinkedPropertyApi(linkedCaseId, { action, note });
+      setData(response);
+      toast.success(action === "ACCEPT" ? "Property link accepted" : "Property link withdrawn");
+      return true;
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, action === "ACCEPT" ? "Failed to accept property link" : "Failed to withdraw property link"));
+      return false;
+    }
+  }
+
   async function requestLandlordReference(linkedCaseId: string, note?: string) {
     try {
       const response = await requestLandlordReferenceApi(linkedCaseId, note);
@@ -342,6 +356,7 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
         initiateDirectPayment,
         shareScoreReport,
         acceptScoreRequest,
+        respondToLinkedProperty,
         requestLandlordReference,
         savePassportPhoto
       }}

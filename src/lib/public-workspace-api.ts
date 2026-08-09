@@ -1,11 +1,13 @@
 import { apiFetch } from "@/lib/api";
 
 export type WorkspaceMembershipRole = "LANDLORD" | "AGENT";
+export type PropertyAgentInviteStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 export type ProposedRenterStatus = "PROPOSED" | "SCORE_REQUESTED" | "SCORE_SHARED" | "UNDER_REVIEW" | "DECISION_READY";
 export type ProposedRenterDecision = "APPROVED" | "HOLD" | "DECLINED";
 export type ScoreRequestStatus = "REQUESTED" | "FORWARDED" | "REVIEWED";
 export type PaymentScheduleType = "RENT" | "UTILITY" | "ESTATE_DUE";
 export type PaymentScheduleStatus = "PENDING" | "PAID" | "OVERDUE";
+export type PaymentConfirmationOutcome = "FULL" | "PARTIAL";
 export type RentScorePaymentProvider = "PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER";
 export type RentScorePaymentStatus = "PENDING" | "PENDING_ACTION" | "AWAITING_MANUAL_CONFIRMATION" | "SUCCEEDED" | "FAILED" | "CANCELLED";
 
@@ -40,6 +42,7 @@ export type WorkspaceProperty = {
     bathroomCount: number;
     annualRentAmountNgn?: number | null;
     isOccupied: boolean;
+    availableForRentInMonths?: number | null;
     currentTenantName?: string | null;
     currentTenantEmail?: string | null;
     currentTenantPhone?: string | null;
@@ -53,6 +56,31 @@ export type WorkspaceProperty = {
     email: string;
     phone: string;
   }>;
+  agentAssignment: {
+    status: PropertyAgentInviteStatus;
+    email: string;
+    name?: string | null;
+  } | null;
+};
+
+export type PendingWorkspaceAgentInvite = {
+  id: string;
+  status: PropertyAgentInviteStatus;
+  recipientEmail: string;
+  createdAt: string;
+  property: {
+    id: string;
+    name: string;
+    summaryLabel: string;
+    address: string;
+    city: string;
+    state: string;
+  };
+  invitedBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
 };
 
 export type WorkspaceProfileResponse = {
@@ -95,6 +123,16 @@ export type WorkspaceProfileResponse = {
     propertyCount: number;
     properties: string[];
   }>;
+  notifications: Array<{
+    id: string;
+    notificationType: "AGENT_INVITE" | "PROPERTY_LINKED" | "PROPERTY_LINK_RESPONSE" | "PAYMENT_UPDATE";
+    title: string;
+    message: string;
+    ctaLabel?: string | null;
+    ctaPath?: string | null;
+    readAt?: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type LinkedRentScoreSummary = {
@@ -116,18 +154,21 @@ export type QueueListItem = {
   city: string;
   state: string;
   status: ProposedRenterStatus;
+  renterLinkResponseStatus: "PENDING" | "ACCEPTED" | "WITHDRAWN";
+  renterLinkRespondedAt?: string | null;
   property: WorkspaceProperty;
-  propertyUnit: {
-    id: string;
-    label: string;
-    summaryLabel?: string | null;
-    address: string;
-    city: string;
-    state: string;
-    bedroomCount: number;
-    bathroomCount: number;
-    isOccupied: boolean;
-  } | null;
+    propertyUnit: {
+      id: string;
+      label: string;
+      summaryLabel?: string | null;
+      address: string;
+      city: string;
+      state: string;
+      bedroomCount: number;
+      bathroomCount: number;
+      isOccupied: boolean;
+      availableForRentInMonths?: number | null;
+    } | null;
   linkedRentScore: LinkedRentScoreSummary;
   decision: {
     decision: ProposedRenterDecision;
@@ -160,6 +201,7 @@ export type QueueListItem = {
     confirmationInitiatedAt?: string | null;
     confirmedAt?: string | null;
     confirmationTiming?: "ON_TIME" | "LATE" | null;
+    confirmationOutcome?: PaymentConfirmationOutcome | null;
   }>;
   createdAt: string;
 };
@@ -175,6 +217,9 @@ export type QueueDetail = {
   city: string;
   state: string;
   status: ProposedRenterStatus;
+  renterLinkResponseStatus: "PENDING" | "ACCEPTED" | "WITHDRAWN";
+  renterLinkRespondedAt?: string | null;
+  renterLinkResponseNote?: string | null;
   notes?: string | null;
   linkedRentScore: LinkedRentScoreSummary;
   linkedRentScoreReport: {
@@ -223,20 +268,21 @@ export type QueueDetail = {
     } | null;
   } | null;
   property: WorkspaceProperty;
-  propertyUnit: {
-    id: string;
-    label: string;
-    summaryLabel?: string | null;
-    address: string;
-    city: string;
-    state: string;
-    bedroomCount: number;
-    bathroomCount: number;
-    isOccupied: boolean;
-    currentTenantName?: string | null;
-    currentTenantEmail?: string | null;
-    currentTenantPhone?: string | null;
-  } | null;
+    propertyUnit: {
+      id: string;
+      label: string;
+      summaryLabel?: string | null;
+      address: string;
+      city: string;
+      state: string;
+      bedroomCount: number;
+      bathroomCount: number;
+      isOccupied: boolean;
+      availableForRentInMonths?: number | null;
+      currentTenantName?: string | null;
+      currentTenantEmail?: string | null;
+      currentTenantPhone?: string | null;
+    } | null;
   scoreRequests: Array<{
     id: string;
     status: ScoreRequestStatus;
@@ -324,6 +370,7 @@ export type QueueDetail = {
       accountType: "RENTER" | "LANDLORD" | "AGENT";
     } | null;
     confirmationTiming?: "ON_TIME" | "LATE" | null;
+    confirmationOutcome?: PaymentConfirmationOutcome | null;
     createdBy: {
       id: string;
       name: string;
@@ -399,7 +446,6 @@ export function getWorkspaceProfile() {
 }
 
 export function updateWorkspaceProfile(input: {
-  accountType?: "LANDLORD" | "AGENT";
   representation?: string | null;
   firstName?: string;
   lastName?: string;
@@ -432,7 +478,7 @@ export function saveWorkspacePassportPhoto(input: {
 }
 
 export function listWorkspaceProperties() {
-  return apiFetch<{ items: WorkspaceProperty[] }>("/api/workspace/properties");
+  return apiFetch<{ items: WorkspaceProperty[]; pendingAgentInvites: PendingWorkspaceAgentInvite[] }>("/api/workspace/properties");
 }
 
 export function createWorkspaceProperty(input: {
@@ -451,6 +497,7 @@ export function createWorkspaceProperty(input: {
     bathroomCount: number;
     annualRentAmountNgn?: number | null;
     isOccupied: boolean;
+    availableForRentInMonths?: number | null;
     currentTenantName?: string;
     currentTenantEmail?: string;
     currentTenantPhone?: string;
@@ -480,6 +527,7 @@ export function updateWorkspaceProperty(
       bathroomCount: number;
       annualRentAmountNgn?: number | null;
       isOccupied: boolean;
+      availableForRentInMonths?: number | null;
       currentTenantName?: string;
       currentTenantEmail?: string;
       currentTenantPhone?: string;
@@ -493,10 +541,28 @@ export function updateWorkspaceProperty(
 }
 
 export function shareWorkspaceProperty(propertyId: string, sharedWithEmail: string) {
-  return apiFetch<{ items: WorkspaceProperty[] }>(`/api/workspace/properties/${encodeURIComponent(propertyId)}/share`, {
-    method: "POST",
-    body: JSON.stringify({ sharedWithEmail })
-  });
+  return apiFetch<{
+    items: WorkspaceProperty[];
+    pendingAgentInvites: PendingWorkspaceAgentInvite[];
+    mode: "INVITE_SENT" | "ALREADY_ACCEPTED";
+    invitePreviewUrl?: string | null;
+  }>(
+    `/api/workspace/properties/${encodeURIComponent(propertyId)}/share`,
+    {
+      method: "POST",
+      body: JSON.stringify({ sharedWithEmail })
+    }
+  );
+}
+
+export function respondToWorkspaceAgentInvite(inviteId: string, action: "ACCEPT" | "DECLINE") {
+  return apiFetch<{ items: WorkspaceProperty[]; pendingAgentInvites: PendingWorkspaceAgentInvite[] }>(
+    `/api/workspace/agent-invites/${encodeURIComponent(inviteId)}/respond`,
+    {
+      method: "POST",
+      body: JSON.stringify({ action })
+    }
+  );
 }
 
 export type WorkspaceAgentSearchResult = {
@@ -676,6 +742,7 @@ export function updateWorkspacePaymentSchedule(paymentScheduleId: string, status
 export function confirmWorkspacePaymentSchedule(
   paymentScheduleId: string,
   input?: {
+    outcome: PaymentConfirmationOutcome;
     paidAt?: string;
     note?: string;
   }

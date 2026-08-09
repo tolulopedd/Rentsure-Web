@@ -233,6 +233,20 @@ export type PendingManualRentScorePaymentItem = {
   };
 };
 
+export type PendingIdentityReviewItem = {
+  accountId: string;
+  name: string;
+  email: string;
+  phone: string;
+  state: string;
+  city: string;
+  address: string;
+  identityVerificationType?: "NIN" | "BVN" | null;
+  maskedValue?: string | null;
+  submittedAt?: string | null;
+  createdAt: string;
+};
+
 export type RentScoreBreakdownItem = {
   ruleId: string;
   code: string;
@@ -457,6 +471,23 @@ export function listAdminRenterActivities() {
 
 export function listAdminLandlordAgentActivities() {
   return apiFetch<{ items: AdminLandlordAgentActivityItem[] }>("/api/admin/landlord-agent-activities");
+}
+
+export function listPendingIdentityReviews() {
+  return apiFetch<{ items: PendingIdentityReviewItem[] }>("/api/admin/identity-reviews");
+}
+
+export function reviewIdentitySubmission(
+  publicAccountId: string,
+  input: {
+    action: "APPROVE" | "FAIL";
+    comment?: string;
+  }
+) {
+  return apiFetch<RenterScoreSnapshot>(`/api/admin/identity-reviews/${encodeURIComponent(publicAccountId)}`, {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export function resendPendingRenterInvite(proposedRenterId: string) {

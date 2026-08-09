@@ -50,6 +50,8 @@ function strongPasswordError(password: string) {
   return null;
 }
 
+const CURRENT_TERMS_VERSION = "2026-08";
+
 export default function VerifyEmail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -60,6 +62,7 @@ export default function VerifyEmail() {
   const [errorMessage, setErrorMessage] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -121,6 +124,10 @@ export default function VerifyEmail() {
       toast.error("Confirm the password.");
       return;
     }
+    if (!acceptedTerms) {
+      toast.error("Accept the Terms and Conditions before continuing.");
+      return;
+    }
     if (password !== confirmPassword) {
       toast.error("Passwords do not match.");
       return;
@@ -132,7 +139,9 @@ export default function VerifyEmail() {
         method: "POST",
         body: JSON.stringify({
           token,
-          password
+          password,
+          acceptedTerms: true,
+          acceptedTermsVersion: CURRENT_TERMS_VERSION
         })
       });
       setAuthSession({
@@ -239,6 +248,27 @@ export default function VerifyEmail() {
                     </span>
                   ))}
                 </div>
+
+                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(event) => setAcceptedTerms(event.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-[var(--rentsure-blue)]"
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <Link
+                      to="/policies#terms-and-conditions"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-[var(--rentsure-blue)] hover:underline"
+                    >
+                      Terms and Conditions
+                    </Link>
+                    .
+                  </span>
+                </label>
 
                 <Button className="w-full" onClick={() => void completeSignup()} disabled={submitting}>
                   {submitting ? "Activating..." : "Set password and continue"}

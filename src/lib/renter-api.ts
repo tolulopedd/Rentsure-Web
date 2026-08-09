@@ -17,6 +17,11 @@ export type RenterDashboardResponse = {
     employmentType?: "EMPLOYED" | "SELF_EMPLOYED" | null;
     employmentYears?: number | null;
     notes?: string | null;
+    identityVerificationType?: "NIN" | "BVN" | null;
+    identitySubmittedAt?: string | null;
+    identityReviewStatus?: "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "FAILED";
+    identityReviewedAt?: string | null;
+    identityReviewComment?: string | null;
     nin?: string | null;
     ninVerifiedAt?: string | null;
     bvn?: string | null;
@@ -75,7 +80,7 @@ export type RenterDashboardResponse = {
   availableRentScorePaymentProviders: Array<"PAYSTACK" | "FLUTTERWAVE" | "MANUAL_TRANSFER">;
   notifications: Array<{
     id: string;
-    notificationType: "PROPERTY_LINKED";
+    notificationType: "PROPERTY_LINKED" | "PROPERTY_LINK_RESPONSE" | "PAYMENT_UPDATE" | "IDENTITY_REVIEW";
     title: string;
     message: string;
     ctaLabel?: string | null;
@@ -118,6 +123,9 @@ export type RenterDashboardResponse = {
   linkedCases: Array<{
     id: string;
     status: string;
+    renterLinkResponseStatus: "PENDING" | "ACCEPTED" | "WITHDRAWN";
+    renterLinkRespondedAt?: string | null;
+    renterLinkResponseNote?: string | null;
     decision?: string | null;
     decisionNote?: string | null;
     property: {
@@ -137,6 +145,7 @@ export type RenterDashboardResponse = {
       bedroomCount: number;
       bathroomCount: number;
       isOccupied: boolean;
+      availableForRentInMonths?: number | null;
       currentTenantName?: string | null;
       currentTenantEmail?: string | null;
       currentTenantPhone?: string | null;
@@ -169,6 +178,7 @@ export type RenterDashboardResponse = {
       confirmationInitiatedAt?: string | null;
       confirmedAt?: string | null;
       confirmationTiming?: "ON_TIME" | "LATE" | null;
+      confirmationOutcome?: "FULL" | "PARTIAL" | null;
       paymentEvidenceObjectKey?: string | null;
       paymentEvidenceFileName?: string | null;
       paymentEvidenceMimeType?: string | null;
@@ -233,7 +243,7 @@ export function saveRenterPassportPhoto(input: {
   });
 }
 
-export function verifyRenterIdentity(input: {
+export function submitRenterIdentityForReview(input: {
   verificationType: "NIN" | "BVN";
   value: string;
 }) {
@@ -310,6 +320,19 @@ export function shareRenterScoreReport(input: {
 export function acceptRenterScoreRequest(linkedCaseId: string) {
   return apiFetch<RenterDashboardResponse>(`/api/renter/linked-cases/${encodeURIComponent(linkedCaseId)}/accept-score-request`, {
     method: "POST"
+  });
+}
+
+export function respondToLinkedProperty(
+  linkedCaseId: string,
+  input: {
+    action: "ACCEPT" | "WITHDRAW";
+    note?: string;
+  }
+) {
+  return apiFetch<RenterDashboardResponse>(`/api/renter/linked-cases/${encodeURIComponent(linkedCaseId)}/respond-link`, {
+    method: "POST",
+    body: JSON.stringify(input)
   });
 }
 

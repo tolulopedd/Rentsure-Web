@@ -69,14 +69,16 @@ export function RenterWorkspaceTopbar() {
     return () => clearInterval(timer);
   }, []);
 
+  function actionLabel(label?: string | null) {
+    if (!label) return "Open";
+    return label.trim().toLowerCase() === "open account" ? "Open" : label;
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 backdrop-blur">
       <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 md:px-6">
         <div className="min-w-0">
           <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)] md:text-base">Renter workspace</div>
-          <div className="hidden text-[11px] text-muted-foreground sm:block">
-            Manage your score, view rent score, payment confirmations, and verified your renter profile
-          </div>
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
@@ -112,9 +114,16 @@ export function RenterWorkspaceTopbar() {
                     <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-xs text-slate-500">{formatDate(notification.createdAt)}</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => closeNotification(notification.id)}>
-                        Close
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {notification.ctaPath ? (
+                          <Button type="button" variant="outline" size="sm" onClick={() => nav(notification.ctaPath || "/account/renter/dashboard")}>
+                            {actionLabel(notification.ctaLabel)}
+                          </Button>
+                        ) : null}
+                        <Button type="button" variant="outline" size="sm" onClick={() => closeNotification(notification.id)}>
+                          Close
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

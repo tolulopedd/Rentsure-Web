@@ -46,8 +46,8 @@ export default function RenterWorkspaceProfile() {
   useEffect(() => {
     if (!data) return;
     if (profileDirty) {
-      setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
-      setBvn(data.profile.bvnVerifiedAt ? "" : data.profile.bvn || "");
+      setNin(data.profile.identityVerificationType === "NIN" && data.profile.identityReviewStatus !== "APPROVED" ? data.profile.nin || "" : "");
+      setBvn(data.profile.identityVerificationType === "BVN" && data.profile.identityReviewStatus !== "APPROVED" ? data.profile.bvn || "" : "");
       return;
     }
     setProfileDraft({
@@ -64,17 +64,17 @@ export default function RenterWorkspaceProfile() {
       employmentYears: data.profile.employmentYears == null ? "" : String(Math.min(5, data.profile.employmentYears)),
       notes: data.profile.notes || ""
     });
-    setNin(data.profile.ninVerifiedAt ? "" : data.profile.nin || "");
-    setBvn(data.profile.bvnVerifiedAt ? "" : data.profile.bvn || "");
-    setSelectedIdentityType(data.profile.ninVerifiedAt ? "NIN" : data.profile.bvnVerifiedAt ? "BVN" : "NIN");
+    setNin(data.profile.identityVerificationType === "NIN" && data.profile.identityReviewStatus !== "APPROVED" ? data.profile.nin || "" : "");
+    setBvn(data.profile.identityVerificationType === "BVN" && data.profile.identityReviewStatus !== "APPROVED" ? data.profile.bvn || "" : "");
+    setSelectedIdentityType((data.profile.identityVerificationType as "NIN" | "BVN" | null) || "NIN");
   }, [data, profileDirty]);
 
   if (!data) return null;
   const profile = data.profile;
   const organizationName = profile.organizationName;
   const phoneError = profileDraft.phone.trim() && !isValidNigeriaPhone(profileDraft.phone) ? nigeriaPhoneMessage() : "";
-  const verifiedIdentityType = profile.ninVerifiedAt ? "NIN" : profile.bvnVerifiedAt ? "BVN" : null;
-  const activeIdentityType = verifiedIdentityType ?? selectedIdentityType;
+  const approvedIdentityType = profile.identityReviewStatus === "APPROVED" ? profile.identityVerificationType ?? null : null;
+  const activeIdentityType = (approvedIdentityType ?? profile.identityVerificationType ?? selectedIdentityType) as "NIN" | "BVN";
   const onboarding = useMemo(() => getRenterOnboarding(profile), [profile]);
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding.isComplete;
 
@@ -142,7 +142,7 @@ export default function RenterWorkspaceProfile() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Renter</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Profile</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Keep your personal information and identity validation current so your rent score remains credible.
+          Keep your personal information and identity review current so your rent score remains credible.
         </p>
       </div>
 
@@ -339,7 +339,7 @@ export default function RenterWorkspaceProfile() {
               <CardTitle className="text-lg">Identity validation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              {!verifiedIdentityType ? (
+              {!approvedIdentityType ? (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {(["NIN", "BVN"] as const).map((item) => (
                     <button
@@ -353,7 +353,7 @@ export default function RenterWorkspaceProfile() {
                       }`}
                     >
                       <div className="font-semibold">{item}</div>
-                      <div className="mt-1 text-xs text-current/80">Validate your {item}.</div>
+                      <div className="mt-1 text-xs text-current/80">Submit your {item} for review.</div>
                     </button>
                   ))}
                 </div>
@@ -362,9 +362,12 @@ export default function RenterWorkspaceProfile() {
                 label={activeIdentityType}
                 value={activeIdentityType === "NIN" ? nin : bvn}
                 onChange={activeIdentityType === "NIN" ? setNin : setBvn}
-                verifiedAt={activeIdentityType === "NIN" ? profile.ninVerifiedAt : profile.bvnVerifiedAt}
+                reviewStatus={profile.identityReviewStatus || "NOT_SUBMITTED"}
+                submittedAt={profile.identitySubmittedAt}
+                reviewedAt={profile.identityReviewedAt}
+                reviewComment={profile.identityReviewComment}
                 loading={identitySaving === activeIdentityType}
-                onVerify={() => void submitIdentity(activeIdentityType)}
+                onSubmit={() => void submitIdentity(activeIdentityType)}
               />
             </CardContent>
           </Card>
@@ -454,18 +457,26 @@ function IdentityBlock({
   label,
   value,
   onChange,
-  verifiedAt,
+  reviewStatus,
+  submittedAt,
+  reviewedAt,
+  reviewComment,
   loading,
-  onVerify
+  onSubmit
 }: {
   label: "NIN" | "BVN";
   value: string;
   onChange: (value: string) => void;
-  verifiedAt?: string | null;
+  reviewStatus: "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "FAILED";
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewComment?: string | null;
   loading: boolean;
-  onVerify: () => void;
+  onSubmit: () => void;
 }) {
-  const isVerified = Boolean(verifiedAt);
+  const isApproved = reviewStatus === "APPROVED";
+  const isPending = reviewStatus === "PENDING";
+  const isFailed = reviewStatus === "FAILED";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -473,26 +484,47 @@ function IdentityBlock({
         <div>
           <p className="font-semibold text-slate-950">{label} validation</p>
           <p className="text-sm text-slate-600">
-            {isVerified ? `Verified on ${formatDate(verifiedAt)}` : `Enter your ${label} and validate it through RentSure.`}
+            {isApproved
+              ? `Approved on ${formatDate(reviewedAt)}`
+              : isPending
+                ? `Submitted on ${formatDate(submittedAt)} and awaiting admin review.`
+                : isFailed
+                  ? "Update the information below and submit it again for review."
+                  : `Enter your ${label} and submit it for review.`}
           </p>
         </div>
-        {isVerified ? (
+        {isApproved ? (
           <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Verified</Badge>
+        ) : isPending ? (
+          <Badge variant="outline">Pending review</Badge>
+        ) : isFailed ? (
+          <Badge className="border-rose-200 bg-rose-50 text-rose-700">Update needed</Badge>
         ) : (
-          <Badge variant="outline">Pending</Badge>
+          <Badge variant="outline">Not submitted</Badge>
         )}
       </div>
-      {isVerified ? (
+      {isApproved ? (
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Your {label} has been validated and stored securely. It is no longer shown here.
+          Your {label} has been approved and stored securely. It is no longer shown here.
+        </div>
+      ) : isPending ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Your submission is with RentSure for review. You will receive a notification when it has been approved or if it needs changes.
         </div>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-          <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
-          <Button variant="outline" onClick={onVerify} disabled={loading}>
-            {loading ? "Validating..." : `Validate ${label}`}
-          </Button>
-        </div>
+        <>
+          {isFailed && reviewComment ? (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {reviewComment}
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
+            <Button variant="outline" onClick={onSubmit} disabled={loading}>
+              {loading ? "Submitting..." : `Submit ${label}`}
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );

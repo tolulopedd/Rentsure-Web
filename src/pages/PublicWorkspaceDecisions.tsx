@@ -328,8 +328,8 @@ export default function PublicWorkspaceDecisions() {
             <CardTitle className="text-lg">Linked tenants</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loading ? <p className="text-sm text-muted-foreground">Loading decision queue...</p> : null}
-            {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No proposed renters available yet.</p> : null}
+            {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+            {!loading && !queue.length ? <p className="text-sm text-muted-foreground">No linked tenants yet.</p> : null}
             {!loading && queue.length ? (
               <div className="space-y-2">
                 <Label>Linked tenant</Label>
@@ -355,9 +355,9 @@ export default function PublicWorkspaceDecisions() {
             <CardTitle className="text-lg">Decision details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
-            {detailLoading ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
-            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant to continue.</p> : null}
-            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
+            {detailLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
+            {!detailLoading && !selectedId ? <p className="text-sm text-muted-foreground">Select a linked tenant.</p> : null}
+            {!detailLoading && selectedId && !detail ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
             {detail ? (
               <>
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
@@ -406,9 +406,6 @@ export default function PublicWorkspaceDecisions() {
                                 {rentScoreBandLabel(detail.linkedRentScoreReport.summary.scoreBand)}
                               </Badge>
                             </div>
-                            <p className="mt-2 text-sm text-slate-600">
-                              Shared report is ready for landlord review.
-                            </p>
                           </div>
                           <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[360px]">
                             <div className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -449,9 +446,7 @@ export default function PublicWorkspaceDecisions() {
                             </div>
                           ))}
                           {!detail.linkedRentScoreReport.breakdown.some((item) => item.appliedOccurrences > 0) ? (
-                            <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-500">
-                              No scored activity has been recorded yet for this renter.
-                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-500">No rent score activity yet.</div>
                           ) : null}
                         </div>
                       </div>
@@ -484,9 +479,6 @@ export default function PublicWorkspaceDecisions() {
                           </Button>
                         ) : null}
                       </div>
-                      {!detail.linkedRentScoreReport && !isAgent ? (
-                        <p className="mt-3 text-sm text-slate-500">Download report becomes available once the renter shares a rent score report.</p>
-                      ) : null}
                     </div>
 
                     {detail.decision ? (
@@ -508,15 +500,8 @@ export default function PublicWorkspaceDecisions() {
 
                     {isLandlord ? (
                       <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
-                        {!detail.linkedRentScoreReport ? (
-                          <p className="text-sm text-slate-500">
-                            Decision actions unlock once the rent score report is ready.
-                          </p>
-                        ) : detail.decision ? (
-                          <p className="text-sm text-slate-500">
-                            A decision has already been recorded for this renter. Approve, request for additional information, and decline are now locked.
-                          </p>
-                        ) : null}
+                        {!detail.linkedRentScoreReport ? <p className="text-sm text-slate-500">Rent score not available yet.</p> : null}
+                        {detail.decision ? <p className="text-sm text-slate-500">Decision recorded.</p> : null}
                         <div className="space-y-2">
                           <Label>Decision note</Label>
                           <Textarea
@@ -524,14 +509,14 @@ export default function PublicWorkspaceDecisions() {
                             onChange={(event) => setDecisionNote(event.target.value)}
                             placeholder="Why are you approving, holding, or declining this renter?"
                             className="bg-white"
-                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
+                            disabled={Boolean(detail.decision)}
                           />
                         </div>
                         <div className="mt-4 flex flex-wrap gap-3">
                           <Button
                             onClick={() => void takeDecision("APPROVED")}
                             className="bg-emerald-600 hover:bg-emerald-700"
-                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
+                            disabled={Boolean(detail.decision)}
                           >
                             <ShieldCheck className="mr-2 h-4 w-4" />
                             Approve
@@ -539,7 +524,7 @@ export default function PublicWorkspaceDecisions() {
                           <Button
                             variant="outline"
                             onClick={() => void takeDecision("HOLD")}
-                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
+                            disabled={Boolean(detail.decision)}
                           >
                             <PauseCircle className="mr-2 h-4 w-4" />
                             Request for additional information
@@ -548,7 +533,7 @@ export default function PublicWorkspaceDecisions() {
                             variant="outline"
                             className="border-rose-200 text-rose-700 hover:bg-rose-50"
                             onClick={() => void takeDecision("DECLINED")}
-                            disabled={!detail.linkedRentScoreReport || Boolean(detail.decision)}
+                            disabled={Boolean(detail.decision)}
                           >
                             <ShieldX className="mr-2 h-4 w-4" />
                             Decline
@@ -574,7 +559,7 @@ export default function PublicWorkspaceDecisions() {
 
                       <div className="space-y-3">
                         <p className="text-sm font-semibold text-slate-950">Rent score requests</p>
-                        {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No score requests yet.</p> : null}
+                      {!detail.scoreRequests.length ? <p className="text-sm text-muted-foreground">No rent score requests yet.</p> : null}
                         {detail.scoreRequests.slice(0, 3).map((request) => (
                           <div key={request.id} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
                             <div className="space-y-2 text-sm text-slate-600">

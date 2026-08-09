@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
+import { availableForRentLabel, occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
   decisionBadgeClass,
@@ -25,8 +25,9 @@ export default function RenterWorkspaceQueue() {
     () => linkedCases.find((item) => item.id === selectedId) || null,
     [linkedCases, selectedId]
   );
+  const propertyLinkAccepted = selectedItem?.renterLinkResponseStatus === "ACCEPTED";
   const latestScoreRequest = selectedItem?.scoreRequests[0] || null;
-  const canAcceptLatestRequest = Boolean(latestScoreRequest && !latestScoreRequest.acceptedAt);
+  const canAcceptLatestRequest = Boolean(propertyLinkAccepted && latestScoreRequest && !latestScoreRequest.acceptedAt);
   const requestAlreadyShared = Boolean(
     latestScoreRequest?.acceptedAt &&
       selectedItem &&
@@ -99,6 +100,11 @@ export default function RenterWorkspaceQueue() {
                           <Badge className={occupancyBadgeClass(selectedItem.propertyUnit.isOccupied)} variant="outline">
                             {occupancyLabel(selectedItem.propertyUnit.isOccupied)}
                           </Badge>
+                          {selectedItem.propertyUnit.isOccupied && selectedItem.propertyUnit.availableForRentInMonths ? (
+                            <span className="text-xs text-slate-500">
+                              {availableForRentLabel(selectedItem.propertyUnit.availableForRentInMonths)}
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                       <p className="text-sm text-slate-600">{selectedItem.property.address}</p>
@@ -110,6 +116,9 @@ export default function RenterWorkspaceQueue() {
                       <Badge className={decisionBadgeClass(selectedItem.decision || selectedItem.status)} variant="outline">
                         {selectedItem.decision || selectedItem.status}
                       </Badge>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Property link: {selectedItem.renterLinkResponseStatus.replaceAll("_", " ")}
+                      </p>
                       {selectedItem.decisionNote ? <p className="mt-2 max-w-xs text-sm text-slate-600 lg:ml-auto">{selectedItem.decisionNote}</p> : null}
                     </div>
                   </div>
@@ -203,7 +212,11 @@ export default function RenterWorkspaceQueue() {
                 </Card>
 
                 <div className="flex flex-wrap gap-3">
-                  {canAcceptLatestRequest ? (
+                  {selectedItem.renterLinkResponseStatus !== "ACCEPTED" ? (
+                    <Button disabled className="bg-slate-300 text-slate-700 hover:bg-slate-300">
+                      Accept property link first
+                    </Button>
+                  ) : canAcceptLatestRequest ? (
                     <Button
                       className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
                       onClick={() => void acceptScoreRequest(selectedItem.id)}
@@ -234,6 +247,8 @@ export default function RenterWorkspaceQueue() {
                   <p className="text-sm text-slate-500">
                     Share rent score becomes available here after a landlord or agent requests it from you.
                   </p>
+                ) : selectedItem.renterLinkResponseStatus !== "ACCEPTED" ? (
+                  <p className="text-sm text-slate-500">Accept the property link first from Linked Properties.</p>
                 ) : canAcceptLatestRequest ? (
                   <p className="text-sm text-slate-500">Accept the landlord request first, then share your rent score from here.</p>
                 ) : canShareLatestRequest ? (

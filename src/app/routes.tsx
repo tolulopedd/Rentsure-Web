@@ -14,6 +14,7 @@ import Profile from "@/pages/Profile";
 import AdminUnregisteredRequestsPage from "@/pages/AdminUnregisteredRequestsPage";
 import AdminRenterActivitiesPage from "@/pages/AdminRenterActivitiesPage";
 import AdminLandlordAgentActivitiesPage from "@/pages/AdminLandlordAgentActivitiesPage";
+import AdminIdentityReviewsPage from "@/pages/AdminIdentityReviewsPage";
 import RentersPage from "@/pages/RentersPage";
 import RentScoreSetupPage from "@/pages/RentScoreSetupPage";
 import PublicWorkspaceDashboard from "@/pages/PublicWorkspaceDashboard";
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
           { index: true, element: <AppIndexRedirect /> },
           { path: "dashboard", element: <Dashboard /> },
           { path: "unregistered-requests", element: <AdminRoute element={<AdminUnregisteredRequestsPage />} /> },
+          { path: "identity-reviews", element: <AdminRoute element={<AdminIdentityReviewsPage />} /> },
           { path: "renter-activities", element: <AdminRoute element={<AdminRenterActivitiesPage />} /> },
           { path: "landlord-agent-activities", element: <AdminRoute element={<AdminLandlordAgentActivitiesPage />} /> },
           { path: "renters", element: <AdminRoute element={<RentersPage />} /> },

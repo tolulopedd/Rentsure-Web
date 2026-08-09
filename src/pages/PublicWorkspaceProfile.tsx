@@ -34,7 +34,6 @@ export default function PublicWorkspaceProfile() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [profileDirty, setProfileDirty] = useState(false);
   const [draft, setDraft] = useState({
-    accountType: "LANDLORD" as "LANDLORD" | "AGENT",
     representation: "",
     organizationName: "",
     registrationNumber: "",
@@ -56,7 +55,6 @@ export default function PublicWorkspaceProfile() {
       setData(response);
       if (!profileDirty) {
         setDraft({
-          accountType: response.profile.accountType,
           representation: response.profile.representation || "",
           organizationName: response.profile.organizationName || "",
           registrationNumber: response.profile.registrationNumber || "",
@@ -79,7 +77,7 @@ export default function PublicWorkspaceProfile() {
       localStorage.setItem("userPhone", response.profile.phone || "");
       localStorage.setItem("userPhotoUrl", response.profile.passportPhoto?.viewUrl || "");
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error, "Failed to load landlord / agent profile"));
+      toast.error(getErrorMessage(error, "Failed to load profile"));
     } finally {
       setLoading(false);
     }
@@ -120,7 +118,6 @@ export default function PublicWorkspaceProfile() {
     try {
       setSaving(true);
       const response = await updateWorkspaceProfile({
-        accountType: draft.accountType,
         representation: draft.representation || null,
         organizationName: profile?.entityType === "COMPANY" ? draft.organizationName : null,
         registrationNumber: profile?.entityType === "COMPANY" ? draft.registrationNumber : null,
@@ -132,7 +129,7 @@ export default function PublicWorkspaceProfile() {
         address: draft.address,
         propertyCount: draft.propertyCount || null,
         portfolioType: draft.portfolioType || null,
-      notes: draft.notes || null
+        notes: draft.notes || null
       });
       setData(response);
       setProfileDirty(false);
@@ -178,32 +175,33 @@ export default function PublicWorkspaceProfile() {
   }
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground">Loading landlord / agent profile...</div>;
+    return <div className="text-sm text-muted-foreground">Loading profile...</div>;
   }
 
   if (!profile) {
-    return <div className="text-sm text-destructive">We could not load this landlord / agent profile.</div>;
+    return <div className="text-sm text-destructive">We could not load this profile.</div>;
   }
   const phoneError = draft.phone.trim() && !isValidNigeriaPhone(draft.phone) ? nigeriaPhoneMessage() : "";
   const linkedAccounts = data?.linkedAccounts || [];
+  const roleLabel = profile.accountType === "AGENT" ? "Agent" : "Landlord";
 
   const roleOptions =
-    profile.entityType === "COMPANY"
-      ? [
-          { accountType: "LANDLORD" as const, representation: "We are Landlord", label: "We are Landlord" },
-          { accountType: "AGENT" as const, representation: "We are Agent for Landlord", label: "We are Agent for Landlord" },
-          { accountType: "AGENT" as const, representation: "We are Management Company", label: "We are Management Company" }
-        ]
-      : [
-          { accountType: "LANDLORD" as const, representation: "I am Landlord", label: "I am Landlord" },
-          { accountType: "AGENT" as const, representation: "I am Agent for Landlord", label: "I am Agent for Landlord" }
-        ];
+    profile.accountType === "LANDLORD"
+      ? profile.entityType === "COMPANY"
+        ? [{ accountType: "LANDLORD" as const, representation: "We are Landlord", label: "We are Landlord" }]
+        : [{ accountType: "LANDLORD" as const, representation: "I am Landlord", label: "I am Landlord" }]
+      : profile.entityType === "COMPANY"
+        ? [
+            { accountType: "AGENT" as const, representation: "We are Agent", label: "We are Agent" },
+            { accountType: "AGENT" as const, representation: "We are Management Company", label: "We are Management Company" }
+          ]
+        : [{ accountType: "AGENT" as const, representation: "I am Agent", label: "I am Agent" }];
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">
-          Landlord / agent
+          {roleLabel}
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Profile</h1>
       </div>
@@ -212,10 +210,10 @@ export default function PublicWorkspaceProfile() {
         <Card className="border-[var(--rentsure-blue-soft)] bg-[linear-gradient(135deg,#ffffff,#f5f8ff)] shadow-sm">
           <CardHeader className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">
-              {onboarding.isComplete ? "Ready to go" : "Landlord / agent onboarding"}
+              {onboarding.isComplete ? "Ready to go" : `${roleLabel} onboarding`}
             </div>
             <CardTitle className="text-xl">
-              {onboarding.isComplete ? "Your workspace profile is in good shape" : "Finish setting up this workspace profile"}
+              {onboarding.isComplete ? `Your ${roleLabel.toLowerCase()} profile is in good shape` : `Finish setting up this ${roleLabel.toLowerCase()} profile`}
             </CardTitle>
             <p className="text-sm text-slate-600">
               {onboarding.completedCount} of {onboarding.totalCount} key setup steps completed.
@@ -258,59 +256,19 @@ export default function PublicWorkspaceProfile() {
             <CardTitle className="text-lg">Profile information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Workspace role</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {([
-                  { value: "LANDLORD", label: "Landlord" },
-                  { value: "AGENT", label: "Agent" }
-                ] as const).map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() =>
-                      {
-                        setProfileDirty(true);
-                        setDraft((current) => {
-                          const nextRepresentation =
-                            roleOptions.find((option) => option.accountType === item.value)?.representation || "";
-                          return {
-                          ...current,
-                          accountType: item.value,
-                          representation: roleOptions.some(
-                            (option) => option.accountType === item.value && option.representation === current.representation
-                          )
-                            ? current.representation
-                            : nextRepresentation
-                          };
-                        });
-                      }
-                    }
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                      draft.accountType === item.value
-                        ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="font-semibold">{item.label}</div>
-                    <div className="mt-1 text-xs text-current/80">Use this workspace as {item.label.toLowerCase()}.</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <Field label="Workspace role" value={roleLabel} onChange={() => {}} readOnly />
 
             <div className="space-y-2">
               <Label>Representation</Label>
               <div className="grid gap-2">
                 {roleOptions
-                  .filter((item) => item.accountType === draft.accountType)
                   .map((item) => (
                     <button
                     key={item.label}
                     type="button"
                     onClick={() => {
                       setProfileDirty(true);
-                      setDraft((current) => ({ ...current, representation: item.representation, accountType: item.accountType }));
+                      setDraft((current) => ({ ...current, representation: item.representation }));
                     }}
                       className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
                         draft.representation === item.representation
@@ -449,12 +407,12 @@ export default function PublicWorkspaceProfile() {
               </div>
               <CardTitle className="text-3xl tracking-[-0.03em] text-slate-950">{accountName}</CardTitle>
               <p className="text-sm leading-6 text-slate-500">
-                This profile powers the shared landlord and agent workspace for renter review, rent score requests, and payment coordination.
+                This profile powers your workspace.
               </p>
             </CardHeader>
             <CardContent className="grid gap-4">
               <InfoTile label="Email" value={profile.email} icon={Mail} />
-              <InfoTile label="Account type" value={profile.accountType.toLowerCase()} icon={ShieldCheck} />
+              <InfoTile label="Account type" value={roleLabel} icon={ShieldCheck} />
               <InfoTile label="Phone" value={profile.phone || "-"} icon={Phone} />
               <InfoTile label="Coverage" value="Nigeria RentSure Operations" icon={MapPin} />
               {profile.organizationName ? <InfoTile label="Entity" value={profile.organizationName} icon={Building2} /> : null}

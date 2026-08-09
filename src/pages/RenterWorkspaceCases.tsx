@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
+import { availableForRentLabel, occupancyBadgeClass, occupancyLabel, propertyUnitDisplayName } from "@/lib/property-display";
 import { useRenterWorkspace } from "@/lib/renter-workspace-context";
 import {
   decisionBadgeClass,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/renter-workspace-presenters";
 
 export default function RenterWorkspaceCases() {
-  const { data, requestLandlordReference } = useRenterWorkspace();
+  const { data, requestLandlordReference, respondToLinkedProperty } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
   const [selectedId, setSelectedId] = useState("");
   const [referenceNote, setReferenceNote] = useState("");
@@ -27,8 +27,11 @@ export default function RenterWorkspaceCases() {
   );
   const pendingLandlordReferenceRequest =
     selectedCase?.landlordReferenceRequests.find((request) => request.status === "PENDING") || null;
+  const linkPending = selectedCase?.renterLinkResponseStatus === "PENDING";
+  const linkAccepted = selectedCase?.renterLinkResponseStatus === "ACCEPTED";
+  const canWithdrawLink = Boolean(linkAccepted && !selectedCase?.decision);
   const canShowLandlordReference =
-    selectedCase?.decision === "APPROVED" && Boolean(selectedCase.propertyUnit?.isOccupied);
+    selectedCase?.decision === "APPROVED" && Boolean(selectedCase.propertyUnit?.isOccupied) && linkAccepted;
   const canRequestLandlordReference = canShowLandlordReference && !pendingLandlordReferenceRequest;
 
   if (!data) return null;
@@ -37,7 +40,7 @@ export default function RenterWorkspaceCases() {
     <div className="space-y-4 md:space-y-6">
       <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.16),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">My Links</p>
-        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-2xl">Track every properties linked to you</h1>
+        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-2xl">Linked properties</h1>
       </div>
 
       <div className="space-y-4 md:space-y-6">
@@ -46,7 +49,7 @@ export default function RenterWorkspaceCases() {
             <CardTitle className="text-lg">Linked properties</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No landlord or agent property is linked to your renter account yet.</p> : null}
+            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No linked properties yet.</p> : null}
             {linkedCases.length ? (
               <div className="space-y-2">
                 <Label>Linked property</Label>
@@ -72,8 +75,8 @@ export default function RenterWorkspaceCases() {
             <CardTitle className="text-lg">Property detail</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {!selectedId ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
-            {selectedId && !selectedCase ? <p className="text-sm text-muted-foreground">Loading property detail...</p> : null}
+            {!selectedId ? <p className="text-sm text-muted-foreground">Select a property.</p> : null}
+            {selectedId && !selectedCase ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
             {selectedCase ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -90,6 +93,11 @@ export default function RenterWorkspaceCases() {
                           <Badge className={occupancyBadgeClass(selectedCase.propertyUnit.isOccupied)} variant="outline">
                             {occupancyLabel(selectedCase.propertyUnit.isOccupied)}
                           </Badge>
+                          {selectedCase.propertyUnit.isOccupied && selectedCase.propertyUnit.availableForRentInMonths ? (
+                            <span className="text-xs text-slate-500">
+                              {availableForRentLabel(selectedCase.propertyUnit.availableForRentInMonths)}
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                       <p className="text-sm text-slate-600">{selectedCase.property.address}</p>
@@ -106,6 +114,38 @@ export default function RenterWorkspaceCases() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Property link response</p>
+                      <p className="mt-1 font-semibold text-slate-950">
+                        {selectedCase.renterLinkResponseStatus.replaceAll("_", " ")}
+                      </p>
+                      {selectedCase.renterLinkRespondedAt ? (
+                        <p className="text-sm text-slate-600">Responded on {formatDate(selectedCase.renterLinkRespondedAt)}</p>
+                      ) : (
+                        <p className="text-sm text-slate-600">Accept or withdraw this property link first.</p>
+                      )}
+                      {selectedCase.renterLinkResponseNote ? <p className="mt-1 text-sm text-slate-500">{selectedCase.renterLinkResponseNote}</p> : null}
+                    </div>
+                    {linkPending || canWithdrawLink ? (
+                      <div className="flex flex-wrap gap-2">
+                        {linkPending ? (
+                          <Button
+                            className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                            onClick={() => void respondToLinkedProperty(selectedCase.id, "ACCEPT")}
+                          >
+                            Accept
+                          </Button>
+                        ) : null}
+                        <Button variant="outline" onClick={() => void respondToLinkedProperty(selectedCase.id, "WITHDRAW")}>
+                          Withdraw
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
                 <div className="grid gap-3 md:grid-cols-3">
                   <MiniCard label="Score requests" value={String(selectedCase.scoreRequests.length)} />
                   <MiniCard label="Payment schedules" value={String(selectedCase.paymentSchedules.length)} />
@@ -119,7 +159,7 @@ export default function RenterWorkspaceCases() {
                     </CardHeader>
                     <CardContent className="space-y-3 px-0 pb-0">
                       {!selectedCase.landlordReferenceRequests.length ? (
-                        <p className="text-sm text-muted-foreground">No landlord reference request has been submitted for this property yet.</p>
+                        <p className="text-sm text-muted-foreground">No landlord reference request yet.</p>
                       ) : null}
                       {selectedCase.landlordReferenceRequests.map((request) => (
                         <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -143,7 +183,7 @@ export default function RenterWorkspaceCases() {
                           onChange={(event) => setReferenceNote(event.target.value)}
                           disabled={!canRequestLandlordReference}
                           className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                          placeholder="Add a short note to the landlord reference request"
+                          placeholder="Note"
                         />
                         <Button
                           variant="outline"
@@ -159,7 +199,7 @@ export default function RenterWorkspaceCases() {
                         </Button>
                         {pendingLandlordReferenceRequest ? (
                           <p className="text-sm text-slate-500">
-                            A landlord reference request is already pending with {pendingLandlordReferenceRequest.landlordName}. You can request another one after this request is completed or declined.
+                            Reference request pending with {pendingLandlordReferenceRequest.landlordName}.
                           </p>
                         ) : null}
                       </div>
@@ -174,8 +214,9 @@ export default function RenterWorkspaceCases() {
                     </CardHeader>
                     <CardContent className="space-y-3 px-0 pb-0">
                       {!selectedCase.scoreRequests.length ? (
-                        <p className="text-sm text-muted-foreground">No rent score request has been logged yet for this case.</p>
+                        <p className="text-sm text-muted-foreground">No rent score request yet.</p>
                       ) : null}
+                      {!linkAccepted ? <p className="text-sm text-muted-foreground">Rent score requests become available after you accept the property link.</p> : null}
                       {selectedCase.scoreRequests.map((request) => (
                         <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -197,7 +238,7 @@ export default function RenterWorkspaceCases() {
                     </CardHeader>
                     <CardContent className="space-y-3 px-0 pb-0">
                       {!selectedCase.paymentSchedules.length ? (
-                        <p className="text-sm text-muted-foreground">No payment schedule has been attached to this case yet.</p>
+                        <p className="text-sm text-muted-foreground">No payment schedule yet.</p>
                       ) : null}
                       {selectedCase.paymentSchedules.map((schedule) => (
                         <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">

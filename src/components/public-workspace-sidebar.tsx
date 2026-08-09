@@ -21,6 +21,8 @@ const items = [
 
 export function PublicWorkspaceSidebar() {
   const nav = useNavigate();
+  const userRole = (localStorage.getItem("userRole") || "LANDLORD").toUpperCase();
+  const roleLabel = userRole === "AGENT" ? "Agent" : "Landlord";
 
   function logout() {
     clearAuthSession();
@@ -39,7 +41,7 @@ export function PublicWorkspaceSidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-6">
         <div className="mb-5 rounded-2xl border border-[var(--rentsure-blue-soft)] bg-[var(--rentsure-blue-soft)]/60 p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">
-            Landlord / agent
+            {roleLabel}
           </p>
         </div>
 

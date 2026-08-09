@@ -58,9 +58,6 @@ export default function RenterWorkspaceDashboard() {
                   {rentScoreBandLabel(data.rentScore.summary.scoreBand)}
                 </Badge>
               </div>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                To improve your score; verified identity, payment confirmations, and update your profile. These should keep moving your score in the right direction.
-              </p>
             </div>
             <div className="hidden self-start rounded-3xl border border-white/80 bg-white/80 px-4 py-3 text-left backdrop-blur sm:block sm:px-5 sm:py-4 sm:text-right">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Band</p>
@@ -92,7 +89,15 @@ export default function RenterWorkspaceDashboard() {
             <div className="mt-4 grid gap-2 md:grid-cols-3">
               <ScoreAction
                 label="Identity"
-                value={data.profile.ninVerifiedAt || data.profile.bvnVerifiedAt ? "Verified in progress" : "Validate NIN or BVN"}
+                value={
+                  data.profile.identityReviewStatus === "APPROVED"
+                    ? "Approved"
+                    : data.profile.identityReviewStatus === "PENDING"
+                      ? "Pending review"
+                      : data.profile.identityReviewStatus === "FAILED"
+                        ? "Needs update"
+                        : "Submit NIN or BVN"
+                }
               />
               <ScoreAction
                 label="Payments"
@@ -142,9 +147,7 @@ export default function RenterWorkspaceDashboard() {
                 </div>
               ))}
             {!data.rentScore.breakdown.some((item) => item.appliedOccurrences > 0) ? (
-              <p className="text-sm text-muted-foreground">
-                Your score becomes more informative as you verify identity and confirm more payment activity.
-              </p>
+              <p className="text-sm text-muted-foreground">No score activity yet.</p>
             ) : null}
           </CardContent>
         </Card>
@@ -185,7 +188,7 @@ export default function RenterWorkspaceDashboard() {
             <CardTitle className="text-lg">Linked rental properties</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!data.linkedCases.length ? <p className="text-sm text-muted-foreground">No landlord or agent property is currently linked to your renter account.</p> : null}
+            {!data.linkedCases.length ? <p className="text-sm text-muted-foreground">No linked properties yet.</p> : null}
             {data.linkedCases.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
