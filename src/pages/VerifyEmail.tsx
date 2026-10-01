@@ -249,12 +249,12 @@ export default function VerifyEmail() {
                   ))}
                 </div>
 
-                <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <label className="flex items-start gap-3 rounded-2xl border border-[var(--rentsure-blue)]/25 bg-[var(--rentsure-blue)]/5 px-4 py-3 text-sm text-slate-700">
                   <input
                     type="checkbox"
                     checked={acceptedTerms}
                     onChange={(event) => setAcceptedTerms(event.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-[var(--rentsure-blue)]"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-[var(--rentsure-blue)]"
                   />
                   <span>
                     I agree to the{" "}
@@ -270,8 +270,8 @@ export default function VerifyEmail() {
                   </span>
                 </label>
 
-                <Button className="w-full" onClick={() => void completeSignup()} disabled={submitting}>
-                  {submitting ? "Activating..." : "Set password and continue"}
+                <Button className="w-full" onClick={() => void completeSignup()} disabled={submitting || !acceptedTerms}>
+                  {submitting ? "Activating..." : acceptedTerms ? "Set password and continue" : "Accept terms to continue"}
                 </Button>
               </div>
             ) : (
