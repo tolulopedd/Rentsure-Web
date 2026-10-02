@@ -1,5 +1,5 @@
-import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, ClipboardCheck, CreditCard, LayoutDashboard, ListChecks, LogOut, UserCircle2 } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Bell, Building2, ChevronDown, ClipboardCheck, CreditCard, LayoutDashboard, LogOut, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -10,19 +10,17 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-const items = [
-  { label: "Dashboard", to: "/account/dashboard", icon: LayoutDashboard },
-  { label: "Properties", to: "/account/properties", icon: Building2 },
-  { label: "Link Tenant", to: "/account/queue", icon: ListChecks },
-  { label: "Landlord Decision", to: "/account/decisions", icon: ClipboardCheck },
-  { label: "Payments", to: "/account/payments", icon: CreditCard },
-  { label: "Profile", to: "/account/profile", icon: UserCircle2 }
-];
-
 export function PublicWorkspaceSidebar() {
   const nav = useNavigate();
+  const location = useLocation();
   const userRole = (localStorage.getItem("userRole") || "LANDLORD").toUpperCase();
   const roleLabel = userRole === "AGENT" ? "Agent" : "Landlord";
+  const groups = [
+    { label: "Properties & Units", icon: Building2, items: [{ label: "Properties", to: "/account/properties" }, { label: "Link Tenant", to: "/account/queue" }] },
+    { label: "Applications & Tenancies", icon: ClipboardCheck, items: [{ label: "Landlord Decision", to: "/account/decisions" }] },
+    { label: "Payments", icon: CreditCard, items: [{ label: "Payment Schedules", to: "/account/payments" }] },
+    { label: "Notifications", icon: Bell, items: [{ label: "Notification History", to: "/account/notifications" }] }
+  ];
 
   function logout() {
     clearAuthSession();
@@ -46,27 +44,18 @@ export function PublicWorkspaceSidebar() {
         </div>
 
         <nav className="space-y-1">
-          {items.map((it) => {
-            const Icon = it.icon;
+          <NavLink to="/account/dashboard" className={({ isActive }) => cx("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition", isActive ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)] shadow-sm ring-1 ring-[var(--rentsure-blue-soft)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]")}><LayoutDashboard className="h-4 w-4 opacity-80" /><span className="font-medium">Dashboard</span></NavLink>
+          {groups.map((group) => {
+            const Icon = group.icon;
+            const isOpen = group.items.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
             return (
-              <NavLink
-                key={it.to}
-                to={it.to}
-                className={({ isActive }) =>
-                  cx(
-                    "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
-                    isActive
-                      ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)] shadow-sm ring-1 ring-[var(--rentsure-blue-soft)]"
-                      : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]"
-                  )
-                }
-              >
-                <Icon className="h-4 w-4 opacity-80 transition group-hover:opacity-100" />
-                <span className="font-medium">{it.label}</span>
-              </NavLink>
+              <details key={group.label} open={isOpen || undefined} className="group/nav">
+                <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-slate-50 hover:text-[var(--rentsure-blue)] [&::-webkit-details-marker]:hidden"><Icon className="h-4 w-4 opacity-80" /><span className="flex-1 font-medium">{group.label}</span><ChevronDown className="h-4 w-4 transition group-open/nav:rotate-180" /></summary>
+                <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-3">{group.items.map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => cx("block rounded-lg px-3 py-2 text-xs transition", isActive ? "bg-[var(--rentsure-blue-soft)] font-semibold text-[var(--rentsure-blue)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]")}>{item.label}</NavLink>)}</div>
+              </details>
             );
           })}
-
+          <NavLink to="/account/profile" className={({ isActive }) => cx("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition", isActive ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)] shadow-sm ring-1 ring-[var(--rentsure-blue-soft)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]")}><UserCircle2 className="h-4 w-4 opacity-80" /><span className="font-medium">Profile</span></NavLink>
           <Button
             variant="ghost"
             className="w-full justify-start rounded-xl px-3 py-2.5 text-sm text-[var(--rentsure-blue)] hover:bg-slate-50"
