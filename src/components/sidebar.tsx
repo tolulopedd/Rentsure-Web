@@ -1,8 +1,12 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
+  Bell,
+  ChevronDown,
+  ClipboardCheck,
+  CreditCard,
+  FileStack,
   LayoutDashboard,
   Users,
-  ClipboardList,
   Building2,
   SlidersHorizontal,
   UserCircle2,
@@ -22,6 +26,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const nav = useNavigate();
+  const location = useLocation();
   const role = getStoredUserRole();
   const showAdminPortal = isAdminPortalRole(role);
 
@@ -30,19 +35,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     { label: "Profile", to: "/app/profile", icon: UserCircle2 }
   ];
 
-  const adminItems = [
-    { label: "Dashboard", to: "/app/dashboard", icon: LayoutDashboard },
-    { label: "Unregistered Requests", to: "/app/unregistered-requests", icon: ClipboardList },
-    { label: "Identity Reviews", to: "/app/identity-reviews", icon: ClipboardList },
-    { label: "Renter Activities", to: "/app/renter-activities", icon: Users },
-    { label: "Landlord & Agent Activities", to: "/app/landlord-agent-activities", icon: Building2 },
-    { label: "Renter Scores", to: "/app/renters", icon: Users },
-    { label: "User Management", to: "/app/users", icon: UserCircle2 },
-    { label: "Rent Score Setup", to: "/app/rent-score-setup", icon: SlidersHorizontal },
-    ...(canManagePortal(role) ? [{ label: "Profile", to: "/app/profile", icon: UserCircle2 }] : [])
+  const adminGroups = [
+    { label: "Customers", icon: Users, items: [{ label: "All Customers", to: "/app/customers" }, { label: "Identity Reviews", to: "/app/identity-reviews" }, { label: "Renter Scores", to: "/app/renters" }] },
+    { label: "Properties & Units", icon: Building2, items: [{ label: "Landlord & Agent Activities", to: "/app/landlord-agent-activities" }] },
+    { label: "Applications & Tenancies", icon: FileStack, items: [{ label: "Unregistered Requests", to: "/app/unregistered-requests" }, { label: "Renter Activities", to: "/app/renter-activities" }] },
+    { label: "Payments", icon: CreditCard, items: [{ label: "Payment Activity", to: "/app/renter-activities" }] },
+    { label: "Notifications", icon: Bell, items: [{ label: "Renter Notifications", to: "/app/renter-activities" }, { label: "Landlord & Agent Notifications", to: "/app/landlord-agent-activities" }] },
+    { label: "Support", icon: ClipboardCheck, items: [{ label: "Renter Activities", to: "/app/renter-activities" }] },
+    { label: "User Management", icon: UserCircle2, items: [{ label: "Users & Admins", to: "/app/users" }] },
+    { label: "RentScore Settings", icon: SlidersHorizontal, items: [{ label: "Score Rules", to: "/app/rent-score-setup" }] }
   ];
-
-  const items = showAdminPortal ? adminItems : agentItems;
 
   function logout() {
     clearAuthSession();
@@ -60,7 +62,35 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="flex-1 overflow-y-auto px-3 py-6">
         <nav className="space-y-1">
-          {items.map((it) => {
+          {showAdminPortal ? <>
+            <NavLink
+              to="/app/dashboard"
+              onClick={onNavigate}
+              className={({ isActive }) => cx(
+                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
+                "focus:outline-none focus:ring-2 focus:ring-[var(--rentsure-blue-soft)]",
+                isActive ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)] shadow-sm ring-1 ring-[var(--rentsure-blue-soft)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]"
+              )}
+            >
+              <LayoutDashboard className="h-4 w-4 opacity-80" /><span className="font-medium">Dashboard</span>
+            </NavLink>
+            {adminGroups.map((group) => {
+              const Icon = group.icon;
+              const isOpen = group.items.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
+              return (
+                <details key={group.label} open={isOpen || undefined} className="group/nav">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-slate-50 hover:text-[var(--rentsure-blue)] [&::-webkit-details-marker]:hidden">
+                    <Icon className="h-4 w-4 opacity-80" /><span className="flex-1 font-medium">{group.label}</span><ChevronDown className="h-4 w-4 transition group-open/nav:rotate-180" />
+                  </summary>
+                  <div className="ml-4 mt-1 space-y-1 border-l border-slate-200 pl-3">
+                    {group.items.map((item) => <NavLink key={`${group.label}-${item.to}-${item.label}`} to={item.to} onClick={onNavigate} className={({ isActive }) => cx("block rounded-lg px-3 py-2 text-xs transition", isActive ? "bg-[var(--rentsure-blue-soft)] font-semibold text-[var(--rentsure-blue)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]")}>{item.label}</NavLink>)}
+                  </div>
+                </details>
+              );
+            })}
+            {canManagePortal(role) ? <NavLink to="/app/profile" onClick={onNavigate} className={({ isActive }) => cx("group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition", isActive ? "bg-[var(--rentsure-blue-soft)] text-[var(--rentsure-blue)]" : "text-muted-foreground hover:bg-slate-50 hover:text-[var(--rentsure-blue)]")}><UserCircle2 className="h-4 w-4 opacity-80" /><span className="font-medium">Profile</span></NavLink> : null}
+          </> : null}
+          {!showAdminPortal && agentItems.map((it) => {
             const Icon = it.icon;
             return (
               <NavLink
