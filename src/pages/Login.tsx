@@ -21,6 +21,7 @@ type LoginResponse = {
     role: string;
     fullName: string;
     email: string;
+    adminRole?: "SUPER_ADMIN" | "ADMIN" | "SUPPORT_ADMIN" | "READ_ONLY_ADMIN";
     outletId?: string | null;
   };
 };
@@ -73,6 +74,7 @@ export default function Login() {
         userName: data.user.fullName,
         userEmail: data.user.email,
         userId: data.user.id,
+        adminRole: data.user.adminRole,
         outletId: data.user.outletId
       });
 

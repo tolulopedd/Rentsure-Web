@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function RenterWorkspaceShell() {
+function RenterWorkspaceShell({ children }: { children?: ReactNode }) {
   const { data, loading, loadError, refresh } = useRenterWorkspace();
   const nav = useNavigate();
 
@@ -77,6 +78,7 @@ function RenterWorkspaceShell() {
                 { label: "Linked Properties", mobileLabel: "My Links", to: "/account/renter/cases" },
                 { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/renter/queue" },
                 { label: "Payments", mobileLabel: "Payments", to: "/account/renter/payments" },
+                { label: "Notifications", mobileLabel: "Alerts", to: "/account/notifications" },
                 { label: "Profile", mobileLabel: "Profile", to: "/account/renter/profile" }
               ].map((item) => (
                 <NavLink
@@ -111,7 +113,7 @@ function RenterWorkspaceShell() {
           <main className="relative flex-1 overflow-y-auto p-3 md:p-6">
             <div className="mx-auto max-w-7xl">
               <div className="rounded-xl bg-background p-3 shadow-sm md:p-6">
-                <Outlet />
+                {children || <Outlet />}
               </div>
             </div>
           </main>
@@ -121,10 +123,10 @@ function RenterWorkspaceShell() {
   );
 }
 
-export function RenterWorkspaceLayout() {
+export function RenterWorkspaceLayout({ children }: { children?: ReactNode }) {
   return (
     <RenterWorkspaceProvider>
-      <RenterWorkspaceShell />
+      <RenterWorkspaceShell>{children}</RenterWorkspaceShell>
     </RenterWorkspaceProvider>
   );
 }

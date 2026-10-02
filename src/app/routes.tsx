@@ -17,6 +17,8 @@ import AdminLandlordAgentActivitiesPage from "@/pages/AdminLandlordAgentActiviti
 import AdminIdentityReviewsPage from "@/pages/AdminIdentityReviewsPage";
 import RentersPage from "@/pages/RentersPage";
 import RentScoreSetupPage from "@/pages/RentScoreSetupPage";
+import AdminUserManagementPage from "@/pages/AdminUserManagementPage";
+import AdminUserDetailsPage from "@/pages/AdminUserDetailsPage";
 import PublicWorkspaceDashboard from "@/pages/PublicWorkspaceDashboard";
 import PublicWorkspaceQueue from "@/pages/PublicWorkspaceQueue";
 import PublicWorkspaceDecisions from "@/pages/PublicWorkspaceDecisions";
@@ -32,7 +34,15 @@ import RenterWorkspacePayments from "@/pages/RenterWorkspacePayments";
 import RenterWorkspaceProfile from "@/pages/RenterWorkspaceProfile";
 import RenterWorkspaceBuyScore from "@/pages/RenterWorkspaceBuyScore";
 import RenterWorkspaceShareScore from "@/pages/RenterWorkspaceShareScore";
+import NotificationsPage from "@/pages/NotificationsPage";
 import { AccountIndexRedirect, AdminRoute, AppIndexRedirect, PublicWorkspaceRoute, RenterWorkspaceRoute } from "@/app/route-guards";
+import { canAccessPublicWorkspace } from "@/lib/roles";
+
+function NotificationsWorkspaceRoute() {
+  return canAccessPublicWorkspace()
+    ? <PublicWorkspaceLayout><NotificationsPage /></PublicWorkspaceLayout>
+    : <RenterWorkspaceLayout><NotificationsPage /></RenterWorkspaceLayout>;
+}
 
 export const router = createBrowserRouter([
   { path: "/", element: <Landing />, errorElement: <RouteError /> },
@@ -47,6 +57,7 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <AccountIndexRedirect /> },
+      { path: "notifications", element: <NotificationsWorkspaceRoute /> },
       { path: "home", element: <AccountHome /> },
       { path: "renter-dashboard", element: <Navigate to="/account/renter/dashboard" replace /> },
       {
@@ -92,9 +103,10 @@ export const router = createBrowserRouter([
           { path: "landlord-agent-activities", element: <AdminRoute element={<AdminLandlordAgentActivitiesPage />} /> },
           { path: "renters", element: <AdminRoute element={<RentersPage />} /> },
           { path: "rent-score-setup", element: <AdminRoute element={<RentScoreSetupPage />} /> },
+          { path: "users", element: <AdminRoute element={<AdminUserManagementPage />} /> },
+          { path: "users/:id", element: <AdminRoute element={<AdminUserDetailsPage />} /> },
           { path: "profile", element: <Profile /> },
           { path: "admin", element: <Navigate to="/app/renters" replace /> },
-          { path: "users", element: <Navigate to="/app/renters" replace /> },
           { path: "outlets", element: <Navigate to="/app/renters" replace /> },
           { path: "customer", element: <Navigate to="/app/renters" replace /> },
           { path: "customer-enquiry", element: <Navigate to="/app/renters" replace /> },

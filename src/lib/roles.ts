@@ -1,5 +1,6 @@
 export type AppRole = "ADMIN" | "AGENT";
 export type PublicWorkspaceRole = "AGENT" | "LANDLORD" | "RENTER";
+export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "SUPPORT_ADMIN" | "READ_ONLY_ADMIN";
 
 export function getStoredAccountScope() {
   return localStorage.getItem("accountScope") === "PUBLIC" ? "PUBLIC" : "STAFF";
@@ -16,6 +17,20 @@ export function isAgentRole(role: AppRole) {
 
 export function isAdminPortalRole(role: AppRole) {
   return role === "ADMIN";
+}
+
+export function getStoredAdminRole(): AdminRole {
+  const raw = (localStorage.getItem("adminRole") || "ADMIN").toUpperCase();
+  if (raw === "SUPER_ADMIN" || raw === "SUPPORT_ADMIN" || raw === "READ_ONLY_ADMIN") return raw;
+  return "ADMIN";
+}
+
+export function canAdminEditUsers() {
+  return getStoredAdminRole() !== "READ_ONLY_ADMIN";
+}
+
+export function canAdminManageAdmins() {
+  return getStoredAdminRole() === "SUPER_ADMIN";
 }
 
 export function canManagePortal(role: AppRole) {

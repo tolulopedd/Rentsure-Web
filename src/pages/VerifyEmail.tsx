@@ -31,6 +31,7 @@ type CompleteSignupResponse = {
     role: string;
     fullName: string;
     email: string;
+    adminRole?: "SUPER_ADMIN" | "ADMIN" | "SUPPORT_ADMIN" | "READ_ONLY_ADMIN";
     outletId?: string | null;
   };
 };
@@ -152,6 +153,7 @@ export default function VerifyEmail() {
         userName: payload.user.fullName,
         userEmail: payload.user.email,
         userId: payload.user.id,
+        adminRole: payload.user.adminRole,
         outletId: payload.user.outletId
       });
       toast.success("Email verified. Continue onboarding.");

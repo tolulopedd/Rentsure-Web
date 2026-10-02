@@ -142,7 +142,7 @@ export default function RenterWorkspaceShareScore() {
     }
   }
 
-  function useExistingRecipient(result: ShareRecipientSearchResult) {
+  function applyExistingRecipient(result: ShareRecipientSearchResult) {
     setSelectedRecipient(result);
     setDraft((current) => ({
       ...current,
@@ -349,7 +349,7 @@ export default function RenterWorkspaceShareScore() {
                   <button
                     key={result.id}
                     type="button"
-                    onClick={() => useExistingRecipient(result)}
+                    onClick={() => applyExistingRecipient(result)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
                       selectedRecipient?.id === result.id
                         ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/50"

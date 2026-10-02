@@ -69,13 +69,15 @@ export default function RenterWorkspaceProfile() {
     setSelectedIdentityType((data.profile.identityVerificationType as "NIN" | "BVN" | null) || "NIN");
   }, [data, profileDirty]);
 
-  if (!data) return null;
-  const profile = data.profile;
+  const profile = data?.profile;
+  const onboarding = useMemo(() => (profile ? getRenterOnboarding(profile) : null), [profile]);
+
+  if (!data || !profile || !onboarding) return null;
   const organizationName = profile.organizationName;
+  const entityType = profile.entityType;
   const phoneError = profileDraft.phone.trim() && !isValidNigeriaPhone(profileDraft.phone) ? nigeriaPhoneMessage() : "";
   const approvedIdentityType = profile.identityReviewStatus === "APPROVED" ? profile.identityVerificationType ?? null : null;
   const activeIdentityType = (approvedIdentityType ?? profile.identityVerificationType ?? selectedIdentityType) as "NIN" | "BVN";
-  const onboarding = useMemo(() => getRenterOnboarding(profile), [profile]);
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding.isComplete;
 
   async function submitProfile() {
@@ -85,8 +87,8 @@ export default function RenterWorkspaceProfile() {
     }
     setProfileSaving(true);
     const success = await saveProfile({
-      organizationName: profile.entityType === "COMPANY" ? profileDraft.organizationName : null,
-      registrationNumber: profile.entityType === "COMPANY" ? profileDraft.registrationNumber : null,
+      organizationName: entityType === "COMPANY" ? profileDraft.organizationName : null,
+      registrationNumber: entityType === "COMPANY" ? profileDraft.registrationNumber : null,
       firstName: profileDraft.firstName,
       lastName: profileDraft.lastName,
       phone: profileDraft.phone,

@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { LogOut } from "lucide-react";
 import { PublicWorkspaceSidebar } from "@/components/public-workspace-sidebar";
 import { PublicWorkspaceTopbar } from "@/components/public-workspace-topbar";
@@ -10,7 +11,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function PublicWorkspaceLayout() {
+export function PublicWorkspaceLayout({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
 
   function logout() {
@@ -37,6 +38,7 @@ export function PublicWorkspaceLayout() {
                 { label: "Link Tenant", mobileLabel: "Link", to: "/account/queue" },
                 { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/decisions" },
                 { label: "Payments", mobileLabel: "Payments", to: "/account/payments" },
+                { label: "Notifications", mobileLabel: "Alerts", to: "/account/notifications" },
                 { label: "Profile", mobileLabel: "Profile", to: "/account/profile" }
               ].map((item) => (
                 <NavLink
@@ -71,7 +73,7 @@ export function PublicWorkspaceLayout() {
           <main className="relative flex-1 overflow-y-auto p-3 md:p-6">
             <div className="mx-auto max-w-7xl">
               <div className="rounded-xl bg-background p-3 shadow-sm md:p-6">
-                <Outlet />
+                {children || <Outlet />}
               </div>
             </div>
           </main>

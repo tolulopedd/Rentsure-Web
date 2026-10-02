@@ -13,6 +13,7 @@ type RefreshResponse = {
     role: string;
     fullName: string;
     email: string;
+    adminRole?: "SUPER_ADMIN" | "ADMIN" | "SUPPORT_ADMIN" | "READ_ONLY_ADMIN";
     outletId?: string | null;
   };
 };
@@ -101,6 +102,7 @@ function toRefreshResponse(payload: unknown): RefreshResponse | null {
   const role = user.role;
   const fullName = user.fullName;
   const email = user.email;
+  const adminRole = user.adminRole;
   const outletId = user.outletId;
 
   if (
@@ -121,6 +123,7 @@ function toRefreshResponse(payload: unknown): RefreshResponse | null {
       role,
       fullName,
       email,
+      adminRole: adminRole === "SUPER_ADMIN" || adminRole === "ADMIN" || adminRole === "SUPPORT_ADMIN" || adminRole === "READ_ONLY_ADMIN" ? adminRole : undefined,
       outletId: typeof outletId === "string" || outletId === null || outletId === undefined ? outletId : null
     }
   };
@@ -134,6 +137,7 @@ export function setAuthSession(payload: {
   userName: string;
   userEmail: string;
   userId: string;
+  adminRole?: "SUPER_ADMIN" | "ADMIN" | "SUPPORT_ADMIN" | "READ_ONLY_ADMIN";
   outletId?: string | null;
 }) {
   localStorage.setItem("accessToken", payload.accessToken);
@@ -143,6 +147,8 @@ export function setAuthSession(payload: {
   localStorage.setItem("userName", payload.userName);
   localStorage.setItem("userEmail", payload.userEmail);
   localStorage.setItem("userId", payload.userId);
+  if (payload.adminRole) localStorage.setItem("adminRole", payload.adminRole);
+  else localStorage.removeItem("adminRole");
   if (payload.outletId) {
     localStorage.setItem("outletId", payload.outletId);
   } else {
@@ -166,6 +172,7 @@ export function clearAuthSession() {
   localStorage.removeItem("userName");
   localStorage.removeItem("userEmail");
   localStorage.removeItem("userId");
+  localStorage.removeItem("adminRole");
   localStorage.removeItem("outletId");
   localStorage.removeItem("userPhone");
   localStorage.removeItem("userPhotoUrl");
@@ -214,6 +221,7 @@ async function refreshAccessToken() {
       userName: data.user.fullName,
       userEmail: data.user.email,
       userId: data.user.id,
+      adminRole: data.user.adminRole,
       outletId: data.user.outletId
     });
   })();
