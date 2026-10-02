@@ -179,11 +179,11 @@ export default function RenterDashboard() {
         <div className="mx-auto max-w-3xl">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">We could not load this renter dashboard</CardTitle>
+              <CardTitle className="text-lg">Dashboard unavailable</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600">
-                {loadError || "Something went wrong while loading your renter record."}
+                {loadError || "Unable to load your account."}
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button onClick={() => void loadDashboard()} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
@@ -206,7 +206,7 @@ export default function RenterDashboard() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Renter dashboard</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Your RentSure score, profile, and payment record</h1>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Renter dashboard</h1>
           </div>
           <Button variant="outline" onClick={signOut}>
             Sign out
@@ -223,8 +223,7 @@ export default function RenterDashboard() {
                   <span className="ml-2 text-2xl font-medium text-slate-400">/ {data.rentScore.summary.maxScore}</span>
                 </div>
                 <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                  This is the center of your renter dashboard. Every verified detail, payment confirmation, and trust
-                  signal should help this score become stronger over time.
+                  Verified identity and payment history can improve your score over time.
                 </p>
               </div>
               <div className="rounded-3xl border border-white/80 bg-white/80 px-5 py-4 text-right backdrop-blur">
@@ -342,7 +341,7 @@ export default function RenterDashboard() {
               <CardTitle className="text-lg">Confirm payments</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!pendingSchedules.length ? <p className="text-sm text-muted-foreground">No pending payment schedules linked to your renter record yet.</p> : null}
+              {!pendingSchedules.length ? <p className="text-sm text-muted-foreground">No pending payments.</p> : null}
               {pendingSchedules.map((schedule) => (
                 <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -375,7 +374,7 @@ export default function RenterDashboard() {
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">What is driving your score</CardTitle>
+              <CardTitle className="text-lg">Score factors</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {data.rentScore.breakdown
@@ -394,7 +393,7 @@ export default function RenterDashboard() {
                   </div>
                 ))}
               {!data.rentScore.breakdown.some((item) => item.appliedOccurrences > 0) ? (
-                <p className="text-sm text-muted-foreground">Your score will become more informative as you verify identity and confirm more payment activity.</p>
+                <p className="text-sm text-muted-foreground">Verify your identity and confirm payments to build your score.</p>
               ) : null}
             </CardContent>
           </Card>
@@ -406,7 +405,7 @@ export default function RenterDashboard() {
               <CardTitle className="text-lg">Linked rental cases</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!data.linkedCases.length ? <p className="text-sm text-muted-foreground">No landlord or agent case is currently linked to your renter account.</p> : null}
+              {!data.linkedCases.length ? <p className="text-sm text-muted-foreground">No linked properties.</p> : null}
               {data.linkedCases.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -555,3 +554,4 @@ function MiniCard({
     </div>
   );
 }
+

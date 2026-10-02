@@ -216,7 +216,7 @@ export default function RenterWorkspaceCases() {
                       {!selectedCase.scoreRequests.length ? (
                         <p className="text-sm text-muted-foreground">No rent score request yet.</p>
                       ) : null}
-                      {!linkAccepted ? <p className="text-sm text-muted-foreground">Rent score requests become available after you accept the property link.</p> : null}
+                      {!linkAccepted ? <p className="text-sm text-muted-foreground">Accept the property link to enable rent score requests.</p> : null}
                       {selectedCase.scoreRequests.map((request) => (
                         <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -310,3 +310,4 @@ function MiniCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

@@ -396,7 +396,7 @@ export default function PublicWorkspaceQueue() {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Link tenant to your property</h1>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Link tenant</h1>
         <Button
           type="button"
           variant="outline"
@@ -578,7 +578,7 @@ export default function PublicWorkspaceQueue() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Property-tenant details</CardTitle>
+                  <CardTitle className="text-lg">Tenant details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
             {detailLoading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
@@ -669,13 +669,13 @@ export default function PublicWorkspaceQueue() {
                       {requestButtonLabel}
                     </Button>
                   </div>
-                  {!renterLinkAccepted ? <p className="text-sm text-slate-500">The renter must accept the property link before you can request rent score.</p> : null}
+                  {!renterLinkAccepted ? <p className="text-sm text-slate-500">The renter must accept the link before you can request a rent score.</p> : null}
 
                   {!isAgent && isApprovedTenant ? (
                     <div className="grid gap-4 xl:grid-cols-2">
                       <Card className="border-slate-200 shadow-none">
                         <CardHeader className="px-0 pt-0">
-                          <CardTitle className="text-base">Renter behaviour review</CardTitle>
+                          <CardTitle className="text-base">Behaviour review</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 px-0 pb-0">
                           <div className="space-y-2">
@@ -716,7 +716,7 @@ export default function PublicWorkspaceQueue() {
 
                       <Card className="border-slate-200 shadow-none">
                         <CardHeader className="px-0 pt-0">
-                          <CardTitle className="text-base">Landlord reference requests</CardTitle>
+                          <CardTitle className="text-base">Landlord references</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 px-0 pb-0">
                           {!detail.landlordReferenceRequests.length ? <p className="text-sm text-muted-foreground">No landlord reference requests yet.</p> : null}
@@ -856,3 +856,4 @@ function getLeaseComplianceRatingFromDetail(detail: QueueDetail): BehaviourRatin
   if (codes.some((item) => item.code === "LEASE_COMPLIANCE_POOR" && item.quantity > 0)) return "POOR";
   return null;
 }
+

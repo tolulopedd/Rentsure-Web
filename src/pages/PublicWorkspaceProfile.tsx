@@ -407,7 +407,7 @@ export default function PublicWorkspaceProfile() {
               </div>
               <CardTitle className="text-3xl tracking-[-0.03em] text-slate-950">{accountName}</CardTitle>
               <p className="text-sm leading-6 text-slate-500">
-                This profile powers your workspace.
+                Manage your account details.
               </p>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -522,3 +522,4 @@ function InfoTile({
     </div>
   );
 }
+

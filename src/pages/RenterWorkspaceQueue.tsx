@@ -44,9 +44,9 @@ export default function RenterWorkspaceQueue() {
     <div className="space-y-4 md:space-y-6">
       <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_34%),linear-gradient(135deg,#ffffff,#f7fbff_58%,#eef5ff)] p-4 shadow-sm md:rounded-[28px] md:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Landlord Decision</p>
-        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Track landlord decision flow for linked properties</h1>
+        <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Landlord Decision</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 md:mt-3">
-          Follow rent score requests, accept landlord requests, share your rent score, and review the latest property decision updates.
+          Review linked property decisions and share your rent score.
         </p>
       </div>
 
@@ -56,7 +56,7 @@ export default function RenterWorkspaceQueue() {
             <CardTitle className="text-lg">My landlord decisions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No property has been linked into your renter workspace yet.</p> : null}
+            {!linkedCases.length ? <p className="text-sm text-muted-foreground">No linked properties.</p> : null}
             {linkedCases.length ? (
               <div className="space-y-2">
                 <Label>Linked property</Label>
@@ -82,8 +82,8 @@ export default function RenterWorkspaceQueue() {
             <CardTitle className="text-lg">Decision detail</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
-            {!selectedId ? <p className="text-sm text-muted-foreground">Select a linked property to continue.</p> : null}
-            {selectedId && !selectedItem ? <p className="text-sm text-muted-foreground">Loading decision detail...</p> : null}
+            {!selectedId ? <p className="text-sm text-muted-foreground">Select a property.</p> : null}
+            {selectedId && !selectedItem ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
             {selectedItem ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -136,7 +136,7 @@ export default function RenterWorkspaceQueue() {
                   </CardHeader>
                   <CardContent className="space-y-3 px-0 pb-0">
                     {!selectedItem.scoreRequests.length ? (
-                      <p className="text-sm text-muted-foreground">No rent score request has been logged for this property yet.</p>
+                      <p className="text-sm text-muted-foreground">No rent score requests.</p>
                     ) : null}
                     {selectedItem.scoreRequests.map((request) => (
                       <div key={request.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -160,7 +160,7 @@ export default function RenterWorkspaceQueue() {
                   </CardHeader>
                   <CardContent className="space-y-3 px-0 pb-0">
                     {!selectedItem.paymentSchedules.length ? (
-                      <p className="text-sm text-muted-foreground">No payment schedule has been attached to this linked property yet.</p>
+                      <p className="text-sm text-muted-foreground">No payment schedules.</p>
                     ) : null}
                     {selectedItem.paymentSchedules.map((schedule) => (
                       <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -192,7 +192,7 @@ export default function RenterWorkspaceQueue() {
                   </CardHeader>
                   <CardContent className="space-y-3 px-0 pb-0">
                     {!selectedItem.activities.length ? (
-                      <p className="text-sm text-muted-foreground">No queue activity has been recorded for this linked property yet.</p>
+                      <p className="text-sm text-muted-foreground">No activity.</p>
                     ) : null}
                     {selectedItem.activities.map((activity) => (
                       <div key={activity.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
@@ -250,11 +250,11 @@ export default function RenterWorkspaceQueue() {
                 ) : selectedItem.renterLinkResponseStatus !== "ACCEPTED" ? (
                   <p className="text-sm text-slate-500">Accept the property link first from Linked Properties.</p>
                 ) : canAcceptLatestRequest ? (
-                  <p className="text-sm text-slate-500">Accept the landlord request first, then share your rent score from here.</p>
+                  <p className="text-sm text-slate-500">Accept the request to share your rent score.</p>
                 ) : canShareLatestRequest ? (
-                  <p className="text-sm text-slate-500">Your request has been accepted. Share your rent score so the landlord can review it.</p>
+                  <p className="text-sm text-slate-500">Request accepted. Share your rent score.</p>
                 ) : requestAlreadyShared ? (
-                  <p className="text-sm text-slate-500">You have already shared your rent score for this request. A new landlord request is required before you can share again.</p>
+                  <p className="text-sm text-slate-500">Score shared. A new request is required to share again.</p>
                 ) : null}
               </>
             ) : null}
@@ -278,3 +278,4 @@ function MiniCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

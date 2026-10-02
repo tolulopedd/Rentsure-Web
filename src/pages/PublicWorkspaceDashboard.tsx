@@ -49,7 +49,7 @@ export default function PublicWorkspaceDashboard() {
     }
   );
 
-  if (loading) return <div className="text-muted-foreground">Loading workspace...</div>;
+  if (loading) return <div className="text-muted-foreground">Loading...</div>;
   if (error || !data) {
     return (
       <Card>
@@ -149,3 +149,4 @@ function MetricCard({ label, value, icon: Icon }: { label: string; value: string
     </div>
   );
 }
+

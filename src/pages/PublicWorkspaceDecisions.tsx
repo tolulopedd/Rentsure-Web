@@ -230,7 +230,7 @@ export default function PublicWorkspaceDecisions() {
         </head>
         <body>
           <div class="hero">
-            <h1>RentSure Rent Score Report</h1>
+            <h1>Rent score report</h1>
             <p><strong>Proposed renter:</strong> ${escapeHtml(renter)}</p>
             <p><strong>Property:</strong> ${escapeHtml(propertyDisplayName(detail.property))}</p>
             <p><strong>Unit:</strong> ${escapeHtml(
@@ -507,7 +507,7 @@ export default function PublicWorkspaceDecisions() {
                           <Textarea
                             value={decisionNote}
                             onChange={(event) => setDecisionNote(event.target.value)}
-                            placeholder="Why are you approving, holding, or declining this renter?"
+                            placeholder="Add a decision note"
                             className="bg-white"
                             disabled={Boolean(detail.decision)}
                           />
@@ -580,3 +580,4 @@ export default function PublicWorkspaceDecisions() {
     </div>
   );
 }
+

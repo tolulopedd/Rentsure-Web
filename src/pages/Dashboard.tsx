@@ -112,21 +112,18 @@ export default function Dashboard() {
       <div className="space-y-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-950">Operations dashboard</h1>
-            <p className="mt-2 text-muted-foreground">
-              Monitor renter intake, live score quality, and policy readiness across RentSure.
-            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950">Dashboard</h1>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
               <Link to="/app/renters">
-                Review renter queue
+                Renter scores
                 <Users className="ml-2 h-4 w-4" />
               </Link>
             </Button>
             <Button asChild variant="outline">
               <Link to="/app/rent-score-setup">
-                Open rent score setup
+                Score setup
                 <ClipboardCheck className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -179,20 +176,17 @@ export default function Dashboard() {
 
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">Admin focus</CardTitle>
+              <CardTitle className="text-lg">Overview</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Current workflow</p>
-                <p className="mt-2 text-lg font-semibold text-slate-950">Search-led admin review</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Work from focused admin modules. Search or filter first, then review only the renter, request, or activity you want to inspect.
-                </p>
+                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Admin tools</p>
+                <p className="mt-2 text-lg font-semibold text-slate-950">Search and review</p>
               </div>
               <p><span className="font-medium text-slate-950">Score range:</span> 0 to 900</p>
               <p><span className="font-medium text-slate-950">Score review:</span> Renter Scores</p>
               <p><span className="font-medium text-slate-950">Score setup:</span> Rent Score Setup</p>
-              <p><span className="font-medium text-slate-950">Support modules:</span> Unregistered Requests, Renter Activities, Landlord and Agent Activities</p>
+              <p><span className="font-medium text-slate-950">Support:</span> Unregistered Requests, Renter Activities, Landlord and Agent Activities</p>
             </CardContent>
           </Card>
         </div>
@@ -205,13 +199,10 @@ export default function Dashboard() {
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(28,78,216,0.15),_transparent_35%),linear-gradient(135deg,#ffffff,#f8fbff_58%,#eef5ff)] p-6 shadow-sm">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">
-              Agent dashboard
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Agent</p>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Welcome back, {userName}</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Your job here is to help good renters present complete, credible profiles before a landlord or admin
-              reviewer makes the final decision. This workspace keeps the handoff clean and consistent.
+              Review renter information and support landlord decisions.
             </p>
           </div>
 
@@ -233,7 +224,7 @@ export default function Dashboard() {
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Agent playbook</CardTitle>
+            <CardTitle className="text-lg">Tasks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {agentWorkflow.map((item) => {
@@ -283,7 +274,7 @@ export default function Dashboard() {
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr_0.95fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Documents to collect</CardTitle>
+            <CardTitle className="text-lg">Documents</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {documentChecklist.map((item) => (
@@ -300,7 +291,7 @@ export default function Dashboard() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Score guidance</CardTitle>
+            <CardTitle className="text-lg">Score bands</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {scoreBands.map((band) => (
@@ -317,7 +308,7 @@ export default function Dashboard() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Working notes</CardTitle>
+            <CardTitle className="text-lg">Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-slate-700">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -470,3 +461,4 @@ function MetricCard({
     </div>
   );
 }
+

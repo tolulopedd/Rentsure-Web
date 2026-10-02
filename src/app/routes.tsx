@@ -19,6 +19,7 @@ import RentersPage from "@/pages/RentersPage";
 import RentScoreSetupPage from "@/pages/RentScoreSetupPage";
 import AdminUserManagementPage from "@/pages/AdminUserManagementPage";
 import AdminUserDetailsPage from "@/pages/AdminUserDetailsPage";
+import AdminCustomersPage from "@/pages/AdminCustomersPage";
 import PublicWorkspaceDashboard from "@/pages/PublicWorkspaceDashboard";
 import PublicWorkspaceQueue from "@/pages/PublicWorkspaceQueue";
 import PublicWorkspaceDecisions from "@/pages/PublicWorkspaceDecisions";
@@ -105,6 +106,7 @@ export const router = createBrowserRouter([
           { path: "rent-score-setup", element: <AdminRoute element={<RentScoreSetupPage />} /> },
           { path: "users", element: <AdminRoute element={<AdminUserManagementPage />} /> },
           { path: "users/:id", element: <AdminRoute element={<AdminUserDetailsPage />} /> },
+          { path: "customers", element: <AdminRoute element={<AdminCustomersPage />} /> },
           { path: "profile", element: <Profile /> },
           { path: "admin", element: <Navigate to="/app/renters" replace /> },
           { path: "outlets", element: <Navigate to="/app/renters" replace /> },
@@ -131,3 +133,4 @@ export const router = createBrowserRouter([
     ]
   }
 ]);
+

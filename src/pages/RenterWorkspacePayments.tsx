@@ -205,11 +205,11 @@ export default function RenterWorkspacePayments() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--rentsure-blue)]">Payments</p>
-            <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Payments and proof</h1>
+            <h1 className="mt-2 text-xl font-bold tracking-tight text-slate-950 md:mt-3 md:text-3xl">Payments</h1>
           </div>
           <div className="flex flex-col items-start gap-2 md:items-end">
             <Button type="button" onClick={() => setShowDirectPaymentForm((current) => !current)} disabled={!canInitiatePayment}>
-              {showDirectPaymentForm ? "Cancel" : canInitiatePayment ? "Initiate payment" : "Awaiting property link"}
+              {showDirectPaymentForm ? "Cancel" : canInitiatePayment ? "Add payment" : "No approved units"}
             </Button>
           </div>
         </div>
@@ -224,7 +224,7 @@ export default function RenterWorkspacePayments() {
       {showDirectPaymentForm ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Initiate payment</CardTitle>
+            <CardTitle className="text-lg">Add payment</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {!canInitiatePayment ? (
@@ -319,11 +319,11 @@ export default function RenterWorkspacePayments() {
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr] xl:gap-6">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Payment requests and reviews</CardTitle>
+            <CardTitle className="text-lg">Payment requests</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 md:space-y-4">
             {!pendingApprovedSchedules.length ? (
-              <p className="text-sm text-muted-foreground">No payment requests or pending reviews right now.</p>
+              <p className="text-sm text-muted-foreground">No payment requests.</p>
             ) : null}
             {pendingApprovedSchedules.map((schedule) => {
               const proofLocked = Boolean(schedule.confirmationInitiatedAt);
@@ -418,10 +418,10 @@ export default function RenterWorkspacePayments() {
 
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Recent confirmations</CardTitle>
+            <CardTitle className="text-lg">Confirmations</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!paidSchedules.length ? <p className="text-sm text-muted-foreground">No payment confirmation has been recorded yet.</p> : null}
+            {!paidSchedules.length ? <p className="text-sm text-muted-foreground">No confirmations.</p> : null}
             {paidSchedules.slice(0, 8).map((schedule) => (
               <div key={schedule.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -547,3 +547,4 @@ function SelectField({
     </div>
   );
 }
+

@@ -69,15 +69,13 @@ export default function RenterWorkspaceProfile() {
     setSelectedIdentityType((data.profile.identityVerificationType as "NIN" | "BVN" | null) || "NIN");
   }, [data, profileDirty]);
 
-  const profile = data?.profile;
-  const onboarding = useMemo(() => (profile ? getRenterOnboarding(profile) : null), [profile]);
-
-  if (!data || !profile || !onboarding) return null;
+  if (!data) return null;
+  const profile = data.profile;
   const organizationName = profile.organizationName;
-  const entityType = profile.entityType;
   const phoneError = profileDraft.phone.trim() && !isValidNigeriaPhone(profileDraft.phone) ? nigeriaPhoneMessage() : "";
   const approvedIdentityType = profile.identityReviewStatus === "APPROVED" ? profile.identityVerificationType ?? null : null;
   const activeIdentityType = (approvedIdentityType ?? profile.identityVerificationType ?? selectedIdentityType) as "NIN" | "BVN";
+  const onboarding = useMemo(() => getRenterOnboarding(profile), [profile]);
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding.isComplete;
 
   async function submitProfile() {
@@ -87,8 +85,8 @@ export default function RenterWorkspaceProfile() {
     }
     setProfileSaving(true);
     const success = await saveProfile({
-      organizationName: entityType === "COMPANY" ? profileDraft.organizationName : null,
-      registrationNumber: entityType === "COMPANY" ? profileDraft.registrationNumber : null,
+      organizationName: profile.entityType === "COMPANY" ? profileDraft.organizationName : null,
+      registrationNumber: profile.entityType === "COMPANY" ? profileDraft.registrationNumber : null,
       firstName: profileDraft.firstName,
       lastName: profileDraft.lastName,
       phone: profileDraft.phone,
@@ -144,7 +142,7 @@ export default function RenterWorkspaceProfile() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Renter</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Profile</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Keep your personal information and identity review current so your rent score remains credible.
+          Manage your profile and identity.
         </p>
       </div>
 
@@ -155,7 +153,7 @@ export default function RenterWorkspaceProfile() {
               {onboarding.isComplete ? "Ready to go" : "Renter onboarding"}
             </div>
             <CardTitle className="text-xl">
-              {onboarding.isComplete ? "Your renter profile is in good shape" : "Finish setting up your renter profile"}
+              {onboarding.isComplete ? "Profile complete" : "Complete your profile"}
             </CardTitle>
             <p className="text-sm text-slate-600">
               {onboarding.completedCount} of {onboarding.totalCount} key setup steps completed.
@@ -187,8 +185,8 @@ export default function RenterWorkspaceProfile() {
         imageUrl={profile.passportPhoto?.viewUrl || null}
         createdAt={profile.passportPhoto?.createdAt || null}
         uploading={photoUploading}
-        description="Upload a clear headshot so landlords, agents, and RentSure reviewers can identify this renter profile faster."
-        helperText="Accepted formats: JPG, PNG, or WEBP. We will optimize the image for profile use before saving it."
+        description="Add a profile photo."
+        helperText="JPG, PNG, or WEBP."
         onSelectFile={handlePassportPhotoUpload}
       />
 
@@ -220,7 +218,7 @@ export default function RenterWorkspaceProfile() {
             ) : null}
             {profile.entityType === "COMPANY" ? (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                This renter profile is set up as a company account, so the company name and registration number should stay current.
+                Keep company details current.
               </div>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -551,3 +549,4 @@ function InfoTile({
     </div>
   );
 }
+

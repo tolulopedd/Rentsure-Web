@@ -95,7 +95,7 @@ export default function AdminUserManagementPage() {
 
   return <div className="space-y-6">
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div><p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin workflow</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">User Management</h1><p className="mt-1 text-sm text-muted-foreground">Manage accounts, access and audit history.</p></div>
+      <div><p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">User Management</h1><p className="mt-1 text-sm text-muted-foreground">Manage accounts and access.</p></div>
       {canManageAdmins ? <Button onClick={() => setCreateOpen((value) => !value)}><UserPlus className="mr-2 h-4 w-4" />{createOpen ? "Close" : "Create admin"}</Button> : null}
     </div>
 
@@ -111,3 +111,4 @@ export default function AdminUserManagementPage() {
     </CardContent></Card>
   </div>;
 }
+

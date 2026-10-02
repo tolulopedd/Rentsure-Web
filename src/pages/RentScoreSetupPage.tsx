@@ -248,10 +248,10 @@ export default function RentScoreSetupPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin workflow</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Rent Score Setup</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Keep category totals simple, then select a category to manage the point rows that belong to it.
+          Manage score categories and point values.
         </p>
       </div>
 
@@ -262,7 +262,7 @@ export default function RentScoreSetupPage() {
         </CardHeader>
         <CardContent>
           {loading ? <p className="text-sm text-muted-foreground">Loading rent score setup...</p> : null}
-          {!loading && !categories.length ? <p className="text-sm text-muted-foreground">No active categories available right now.</p> : null}
+          {!loading && !categories.length ? <p className="text-sm text-muted-foreground">No active categories.</p> : null}
 
           {!loading && selectedCategory ? (
             <div className="space-y-4">
@@ -364,7 +364,7 @@ export default function RentScoreSetupPage() {
           <div>
             <CardTitle className="text-lg">{selectedCategory?.name || "Category points"}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Select a category above to view and manage the point rows under it.
+              Select a category to manage its point values.
             </p>
           </div>
           {selectedCategory ? (
@@ -377,7 +377,7 @@ export default function RentScoreSetupPage() {
           {!selectedCategory ? <p className="text-sm text-muted-foreground">Pick a category to continue.</p> : null}
 
           {selectedCategory && !categoryRules.length ? (
-            <p className="text-sm text-muted-foreground">No point rows are configured for this category yet.</p>
+            <p className="text-sm text-muted-foreground">No point rows.</p>
           ) : null}
 
           {selectedCategory && categoryRules.length ? (
@@ -458,3 +458,4 @@ export default function RentScoreSetupPage() {
     </div>
   );
 }
+

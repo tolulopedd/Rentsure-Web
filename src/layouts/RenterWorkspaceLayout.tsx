@@ -25,7 +25,7 @@ function RenterWorkspaceShell({ children }: { children?: ReactNode }) {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-muted/30 px-4 py-6 text-muted-foreground md:px-6 md:py-10">Loading renter workspace...</div>;
+    return <div className="min-h-screen bg-muted/30 px-4 py-6 text-muted-foreground md:px-6 md:py-10">Loading...</div>;
   }
 
   if (!data) {
@@ -34,11 +34,11 @@ function RenterWorkspaceShell({ children }: { children?: ReactNode }) {
         <div className="mx-auto max-w-3xl">
           <Card className="border-slate-200 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">We could not load this renter workspace</CardTitle>
+              <CardTitle className="text-lg">Workspace unavailable</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-slate-600">
-                {loadError || "Something went wrong while loading your renter record."}
+                {loadError || "Unable to load your account."}
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button onClick={() => void refresh()} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
@@ -130,3 +130,4 @@ export function RenterWorkspaceLayout({ children }: { children?: ReactNode }) {
     </RenterWorkspaceProvider>
   );
 }
+

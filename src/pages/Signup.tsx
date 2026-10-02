@@ -161,7 +161,7 @@ export default function Signup() {
 
         <Card className="rounded-[1.75rem] border-slate-200 bg-white/95 shadow-[0_24px_80px_-48px_rgba(18,0,255,0.45)] backdrop-blur">
           <CardHeader className="space-y-3">
-            <CardTitle className="text-center text-xl">Start with your basic details</CardTitle>
+            <CardTitle className="text-center text-xl">Create your account</CardTitle>
             <p className="text-center text-sm text-slate-500">
               {invitedTrack === "AGENT"
                 ? "You were invited as an agent. Complete your basic details to continue."
@@ -263,7 +263,7 @@ export default function Signup() {
                     autoComplete="email"
                   />
                   {invitedTrack === "AGENT" ? (
-                    <p className="text-xs text-slate-500">Use the invited email so the landlord can link this agent profile automatically.</p>
+                    <p className="text-xs text-slate-500">Use the invited email to link this agent account.</p>
                   ) : null}
                 </div>
 
@@ -323,3 +323,4 @@ export default function Signup() {
     </div>
   );
 }
+

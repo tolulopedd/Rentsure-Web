@@ -195,7 +195,7 @@ export default function VerifyEmail() {
                     {result.entityType === "COMPANY" ? "Company" : "Individual"}
                   </div>
                   <p className="mt-3 text-sm leading-6 text-slate-600">
-                    Continue as <span className="font-medium text-slate-900">{result.email}</span>. Set your password to activate this account and continue into RentSure.
+                    Continue as <span className="font-medium text-slate-900">{result.email}</span>. Set your password to activate your account.
                   </p>
                 </div>
 
@@ -303,3 +303,4 @@ export default function VerifyEmail() {
     </div>
   );
 }
+

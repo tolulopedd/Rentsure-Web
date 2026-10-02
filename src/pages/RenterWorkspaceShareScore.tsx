@@ -142,7 +142,7 @@ export default function RenterWorkspaceShareScore() {
     }
   }
 
-  function applyExistingRecipient(result: ShareRecipientSearchResult) {
+  function useExistingRecipient(result: ShareRecipientSearchResult) {
     setSelectedRecipient(result);
     setDraft((current) => ({
       ...current,
@@ -307,7 +307,7 @@ export default function RenterWorkspaceShareScore() {
                   <p className="mt-2 text-sm text-emerald-700">Request accepted on {formatDate(linkedCaseRequest.acceptedAt)}</p>
                 ) : null}
                 {requestAlreadyShared ? (
-                  <p className="mt-2 text-sm text-slate-500">This request has already received your shared rent score. A new request is required before you can share again.</p>
+                  <p className="mt-2 text-sm text-slate-500">Score shared. A new request is required to share again.</p>
                 ) : null}
               </div>
             ) : (
@@ -349,7 +349,7 @@ export default function RenterWorkspaceShareScore() {
                   <button
                     key={result.id}
                     type="button"
-                    onClick={() => applyExistingRecipient(result)}
+                    onClick={() => useExistingRecipient(result)}
                     className={`w-full rounded-2xl border p-4 text-left transition ${
                       selectedRecipient?.id === result.id
                         ? "border-[var(--rentsure-blue)] bg-[var(--rentsure-blue-soft)]/50"
@@ -494,3 +494,4 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+

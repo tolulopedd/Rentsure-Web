@@ -127,7 +127,7 @@ export default function RenterWorkspaceDashboard() {
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">What is driving your score</CardTitle>
+            <CardTitle className="text-lg">Score factors</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.rentScore.breakdown
@@ -222,7 +222,7 @@ export default function RenterWorkspaceDashboard() {
             <CardTitle className="text-lg">Recent shares</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {!data.shareHistory.length ? <p className="text-sm text-muted-foreground">You have not shared your rent score report yet.</p> : null}
+            {!data.shareHistory.length ? <p className="text-sm text-muted-foreground">No shared reports.</p> : null}
             {data.shareHistory.slice(0, 5).map((share) => (
               <div key={share.id} className="rounded-2xl border border-slate-200 bg-white p-3 md:p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -282,3 +282,4 @@ function MiniCard({
     </div>
   );
 }
+

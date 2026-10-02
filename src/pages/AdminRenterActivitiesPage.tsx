@@ -73,7 +73,7 @@ export default function AdminRenterActivitiesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin workflow</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--rentsure-blue)]">Admin</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Renter activities</h1>
       </div>
 
@@ -151,3 +151,4 @@ export default function AdminRenterActivitiesPage() {
     </div>
   );
 }
+

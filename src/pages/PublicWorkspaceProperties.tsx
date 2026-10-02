@@ -651,7 +651,7 @@ export default function PublicWorkspaceProperties() {
             className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
           >
             {showAddForm ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-            {showAddForm ? "Close form" : "Link property"}
+            {showAddForm ? "Close" : "Add property"}
           </Button>
         ) : null}
       </div>
@@ -659,7 +659,7 @@ export default function PublicWorkspaceProperties() {
       {showAddForm && isLandlord ? (
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Link property"}</CardTitle>
+            <CardTitle className="text-lg">{editingPropertyId ? "Edit property" : "Add property"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 md:space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1412,3 +1412,4 @@ function LovEmpty({ text }: { text: string }) {
 function SelectedPill() {
   return <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--rentsure-blue)]">Selected</span>;
 }
+

@@ -170,8 +170,8 @@ export default function Profile() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-950">My Profile</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Update your admin identity details and keep your account secure.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Profile</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your profile.</p>
         </div>
       </div>
 
@@ -307,3 +307,4 @@ export default function Profile() {
     </div>
   );
 }
+

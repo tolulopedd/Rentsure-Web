@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { getWorkspaceProfile } from "@/lib/public-workspace-api";
+import { listNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from "@/lib/notifications-api";
 import { getErrorMessage } from "@/lib/errors";
 
 export function PublicWorkspaceTopbar() {
@@ -13,17 +13,8 @@ export function PublicWorkspaceTopbar() {
   const userRole = (localStorage.getItem("userRole") || "LANDLORD").toLowerCase();
   const userPhotoUrl = localStorage.getItem("userPhotoUrl") || "";
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [notifications, setNotifications] = useState<
-    Array<{
-      id: string;
-      title: string;
-      message: string;
-      ctaLabel?: string | null;
-      ctaPath?: string | null;
-      createdAt: string;
-    }>
-  >([]);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     setPhotoFailed(false);
@@ -34,18 +25,10 @@ export function PublicWorkspaceTopbar() {
 
     const load = async () => {
       try {
-        const response = await getWorkspaceProfile();
+        const response = await listNotifications();
         if (isCancelled) return;
-        setNotifications(
-          response.notifications.map((notification) => ({
-            id: notification.id,
-            title: notification.title,
-            message: notification.message,
-            ctaLabel: notification.ctaLabel,
-            ctaPath: notification.ctaPath,
-            createdAt: notification.createdAt
-          }))
-        );
+        setNotifications(response.notifications);
+        setUnreadCount(response.unreadCount);
       } catch (error) {
         if (!isCancelled) {
           console.error(getErrorMessage(error, "Failed to load notifications"));
@@ -74,19 +57,15 @@ export function PublicWorkspaceTopbar() {
     });
   }, [notifications]);
 
-  const visibleNotifications = useMemo(
-    () => dedupedNotifications.filter((notification) => !dismissedNotificationIds.includes(notification.id)),
-    [dedupedNotifications, dismissedNotificationIds]
-  );
+  const visibleNotifications = dedupedNotifications;
 
-  useEffect(() => {
-    setDismissedNotificationIds((current) =>
-      current.filter((id) => dedupedNotifications.some((notification) => notification.id === id))
-    );
-  }, [dedupedNotifications]);
-
-  function closeNotification(notificationId: string) {
-    setDismissedNotificationIds((current) => (current.includes(notificationId) ? current : [...current, notificationId]));
+  async function readNotification(notification: AppNotification) {
+    if (!notification.readAt) {
+      await markNotificationRead(notification.id);
+      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item));
+      setUnreadCount((count) => Math.max(0, count - 1));
+    }
+    if (notification.ctaPath) nav(notification.ctaPath);
   }
 
   function formatDate(value: string) {
@@ -104,13 +83,13 @@ export function PublicWorkspaceTopbar() {
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-gradient-to-b from-white via-white to-slate-50 backdrop-blur">
       <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-2 md:px-6">
         <div className="min-w-0">
-          <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)] md:text-base">Property workspace</div>
+          <div className="text-sm font-semibold tracking-tight text-[var(--rentsure-blue)] md:text-base">Workspace</div>
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
           <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 lg:flex">
             <Building2 className="h-4 w-4 text-[var(--rentsure-blue)]" />
-            <span className="text-sm text-slate-600">Nigeria RentSure Operations</span>
+            <span className="text-sm text-slate-600">RentSure Operations</span>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -120,9 +99,9 @@ export function PublicWorkspaceTopbar() {
                 aria-label="Open notifications"
               >
                 <Bell className="h-5 w-5" />
-                {visibleNotifications.length > 0 ? (
+                {unreadCount > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[var(--rentsure-blue)] px-1.5 text-[10px] font-semibold text-white">
-                    {visibleNotifications.length}
+                    {unreadCount}
                   </span>
                 ) : null}
               </button>
@@ -131,28 +110,32 @@ export function PublicWorkspaceTopbar() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-950">Notifications</p>
-                  <p className="text-xs text-slate-500">{visibleNotifications.length}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-slate-500">{unreadCount} unread</p>
+                    {unreadCount ? <Button type="button" variant="ghost" size="sm" onClick={() => { void markAllNotificationsRead(); setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() }))); setUnreadCount(0); }}>Mark all read</Button> : null}
+                  </div>
                 </div>
-                {!visibleNotifications.length ? <p className="text-sm text-slate-500">No notifications right now.</p> : null}
+                {!visibleNotifications.length ? <p className="text-sm text-slate-500">No notifications.</p> : null}
                 {visibleNotifications.map((notification) => (
-                  <div key={notification.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div key={notification.id} className={`rounded-2xl border p-3 ${notification.readAt ? "border-slate-200 bg-white" : "border-blue-200 bg-blue-50"}`}>
                     <p className="font-medium text-slate-950">{notification.title}</p>
                     <p className="mt-1 text-sm text-slate-600">{notification.message}</p>
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <p className="text-xs text-slate-500">{formatDate(notification.createdAt)}</p>
                       <div className="flex items-center gap-2">
                         {notification.ctaPath ? (
-                          <Button type="button" variant="outline" size="sm" onClick={() => nav(notification.ctaPath || "/account/properties")}>
+                          <Button type="button" variant="outline" size="sm" onClick={() => void readNotification(notification)}>
                             {actionLabel(notification.ctaLabel)}
                           </Button>
                         ) : null}
-                        <Button type="button" variant="outline" size="sm" onClick={() => closeNotification(notification.id)}>
-                          Close
+                        <Button type="button" variant="outline" size="sm" onClick={() => void readNotification(notification)}>
+                          Mark read
                         </Button>
                       </div>
                     </div>
                   </div>
                 ))}
+                <Button type="button" variant="ghost" className="w-full" onClick={() => nav("/account/notifications")}>View all</Button>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -184,3 +167,4 @@ export function PublicWorkspaceTopbar() {
     </header>
   );
 }
+
