@@ -148,6 +148,7 @@ export type QueueListItem = {
   firstName: string;
   lastName: string;
   organizationName?: string | null;
+  renterAccountId?: string | null;
   email: string;
   phone: string;
   address: string;
@@ -211,6 +212,7 @@ export type QueueDetail = {
   firstName: string;
   lastName: string;
   organizationName?: string | null;
+  renterAccountId?: string | null;
   email: string;
   phone: string;
   address: string;
@@ -611,6 +613,16 @@ export function createWorkspaceProposedRenter(input: {
     method: "POST",
     body: JSON.stringify(input)
   });
+}
+
+export function correctWorkspaceProposedRenterEmail(proposedRenterId: string, email: string) {
+  return apiFetch<QueueDetail & { invitePreviewUrl?: string | null }>(
+    `/api/workspace/queue/${encodeURIComponent(proposedRenterId)}/invite-email`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ email })
+    }
+  );
 }
 
 export function requestWorkspaceRentScore(proposedRenterId: string, notes?: string) {

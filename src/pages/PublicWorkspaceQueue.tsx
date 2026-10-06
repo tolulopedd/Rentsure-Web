@@ -12,6 +12,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { availableForRentLabel, occupancyBadgeClass, occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
 import {
   createWorkspaceProposedRenter,
+  correctWorkspaceProposedRenterEmail,
   respondToLandlordReferenceRequest,
   getWorkspaceQueueItem,
   listWorkspaceProperties,
@@ -83,6 +84,8 @@ export default function PublicWorkspaceQueue() {
   const [searchResults, setSearchResults] = useState<WorkspaceRenterSearchResult[]>([]);
   const [selectedExistingRenter, setSelectedExistingRenter] = useState<WorkspaceRenterSearchResult | null>(null);
   const [invitePreviewUrl, setInvitePreviewUrl] = useState<string | null>(null);
+  const [inviteEmailDraft, setInviteEmailDraft] = useState("");
+  const [correctingInviteEmail, setCorrectingInviteEmail] = useState(false);
   const [propertyMaintenanceRating, setPropertyMaintenanceRating] = useState<BehaviourRating>("GOOD");
   const [leaseComplianceRating, setLeaseComplianceRating] = useState<BehaviourRating>("GOOD");
   const [behaviourNote, setBehaviourNote] = useState("");
@@ -160,6 +163,7 @@ export default function PublicWorkspaceQueue() {
     setPropertyMaintenanceRating(nextPropertyMaintenanceRating || "GOOD");
     setLeaseComplianceRating(nextLeaseComplianceRating || "GOOD");
     setBehaviourNote("");
+    setInviteEmailDraft(detail.email);
 
     setReferenceDrafts((current) => {
       const next: Record<string, ReferenceDraft> = {};
@@ -353,6 +357,28 @@ export default function PublicWorkspaceQueue() {
     }
   }
 
+  async function correctInviteEmail() {
+    if (!detail) return;
+    const email = inviteEmailDraft.trim();
+    if (!isValidEmail(email)) {
+      toast.error("Enter a valid renter email address.");
+      return;
+    }
+
+    try {
+      setCorrectingInviteEmail(true);
+      const response = await correctWorkspaceProposedRenterEmail(detail.id, email);
+      setInvitePreviewUrl(response.invitePreviewUrl || null);
+      setDetail(response);
+      await loadQueue(detail.id, { silent: true });
+      toast.success("Invite email corrected and resent.");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Failed to correct invite email"));
+    } finally {
+      setCorrectingInviteEmail(false);
+    }
+  }
+
   async function submitBehaviourReview() {
     if (!detail) return;
     try {
@@ -392,6 +418,9 @@ export default function PublicWorkspaceQueue() {
   const renterLinkAccepted = detail?.renterLinkResponseStatus === "ACCEPTED";
   const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
   const isApprovedTenant = detail?.decision?.decision === "APPROVED";
+  const canCorrectInviteEmail = Boolean(
+    detail && !isAgent && !detail.renterAccountId && !detail.decision && detail.renterLinkResponseStatus === "PENDING"
+  );
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -603,9 +632,25 @@ export default function PublicWorkspaceQueue() {
                     <div className="divide-y divide-slate-200">
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Contact</p>
-                        <p className="text-sm text-slate-600">
-                          {[detail.email, detail.phone].filter(Boolean).join(" · ") || "Contact details pending"}
-                        </p>
+                        <div className="space-y-2">
+                          <p className="text-sm text-slate-600">
+                            {[detail.email, detail.phone].filter(Boolean).join(" · ") || "Contact details pending"}
+                          </p>
+                          {canCorrectInviteEmail ? (
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <Input
+                                type="email"
+                                value={inviteEmailDraft}
+                                onChange={(event) => setInviteEmailDraft(event.target.value)}
+                                placeholder="Correct renter email"
+                                className="bg-white sm:max-w-sm"
+                              />
+                              <Button type="button" variant="outline" onClick={() => void correctInviteEmail()} disabled={correctingInviteEmail}>
+                                {correctingInviteEmail ? "Sending..." : "Correct email"}
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="grid gap-2 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-start">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-400">Renter address</p>
@@ -856,4 +901,3 @@ function getLeaseComplianceRatingFromDetail(detail: QueueDetail): BehaviourRatin
   if (codes.some((item) => item.code === "LEASE_COMPLIANCE_POOR" && item.quantity > 0)) return "POOR";
   return null;
 }
-

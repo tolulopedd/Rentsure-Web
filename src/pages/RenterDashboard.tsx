@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { NigeriaAddressFields } from "@/components/NigeriaAddressFields";
+import { MapboxAddressFields } from "@/components/MapboxAddressFields";
 import { clearAuthSession } from "@/lib/api";
 import { getErrorMessage } from "@/lib/errors";
 import { rentScoreBandLabel } from "@/lib/rent-score-band";
@@ -292,7 +292,7 @@ export default function RenterDashboard() {
                 <Field label="Phone" value={profileDraft.phone} onChange={(value) => setProfileDraft((current) => ({ ...current, phone: value }))} />
                 <Field label="Email" value={data.profile.email} onChange={() => {}} readOnly />
               </div>
-              <NigeriaAddressFields
+              <MapboxAddressFields
                 stateValue={profileDraft.state}
                 cityValue={profileDraft.city}
                 addressValue={profileDraft.address}
@@ -554,4 +554,3 @@ function MiniCard({
     </div>
   );
 }
-

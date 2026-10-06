@@ -689,6 +689,47 @@ export default function PublicWorkspaceProperties() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <div
+                className="relative"
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setShowAddressLov(false);
+                  }
+                }}
+              >
+                <Input
+                  className="bg-white"
+                  value={draft.address}
+                  onChange={(event) => {
+                    setDraft((current) => ({ ...current, address: event.target.value }));
+                    setShowAddressLov(true);
+                  }}
+                  onFocus={() => setShowAddressLov(true)}
+                  placeholder={NIGERIA_ADDRESS_PLACEHOLDER}
+                />
+                {showAddressLov && (addressLookupLoading || visibleAddressSuggestions.length > 0) ? (
+                  <LovPanel>
+                    {addressLookupLoading ? <LovEmpty text="Searching address suggestions..." /> : null}
+                    {!addressLookupLoading && visibleAddressSuggestions.length ? (
+                      visibleAddressSuggestions.map((suggestion) => (
+                        <LovButton
+                          key={suggestion.key}
+                          onClick={() => selectAddress(suggestion.address, suggestion.city || undefined, suggestion.state || undefined)}
+                        >
+                          <span>{suggestion.address}</span>
+                          <span className="text-xs uppercase tracking-[0.12em] text-slate-400">
+                            {suggestion.city}, {suggestion.state}
+                          </span>
+                        </LovButton>
+                      ))
+                    ) : null}
+                  </LovPanel>
+                ) : null}
+              </div>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>State</Label>
@@ -772,46 +813,6 @@ export default function PublicWorkspaceProperties() {
                               : "No matches found. Enter your city/town manually."
                           }
                         />
-                      ) : null}
-                    </LovPanel>
-                  ) : null}
-                </div>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Address</Label>
-                <div
-                  className="relative"
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                      setShowAddressLov(false);
-                    }
-                  }}
-                >
-                  <Input
-                    className="bg-white"
-                    value={draft.address}
-                    onChange={(event) => {
-                      setDraft((current) => ({ ...current, address: event.target.value }));
-                      setShowAddressLov(true);
-                    }}
-                    onFocus={() => setShowAddressLov(true)}
-                    placeholder={NIGERIA_ADDRESS_PLACEHOLDER}
-                  />
-                  {showAddressLov && (addressLookupLoading || visibleAddressSuggestions.length > 0) ? (
-                    <LovPanel>
-                      {addressLookupLoading ? <LovEmpty text="Searching address suggestions..." /> : null}
-                      {!addressLookupLoading && visibleAddressSuggestions.length ? (
-                        visibleAddressSuggestions.map((suggestion) => (
-                          <LovButton
-                            key={suggestion.key}
-                            onClick={() => selectAddress(suggestion.address, suggestion.city || undefined, suggestion.state || undefined)}
-                          >
-                            <span>{suggestion.address}</span>
-                            <span className="text-xs uppercase tracking-[0.12em] text-slate-400">
-                              {suggestion.city}, {suggestion.state}
-                            </span>
-                          </LovButton>
-                        ))
                       ) : null}
                     </LovPanel>
                   ) : null}
@@ -1412,4 +1413,3 @@ function LovEmpty({ text }: { text: string }) {
 function SelectedPill() {
   return <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--rentsure-blue)]">Selected</span>;
 }
-
