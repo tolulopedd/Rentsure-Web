@@ -93,7 +93,7 @@ export default function RenterWorkspaceDashboard() {
                   data.profile.identityReviewStatus === "APPROVED"
                     ? "Approved"
                     : data.profile.identityReviewStatus === "PENDING"
-                      ? "Pending review"
+                      ? "Update identity"
                       : data.profile.identityReviewStatus === "FAILED"
                         ? "Needs update"
                         : "Submit NIN or BVN"
@@ -282,4 +282,3 @@ function MiniCard({
     </div>
   );
 }
-

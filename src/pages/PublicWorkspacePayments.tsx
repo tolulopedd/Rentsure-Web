@@ -1,3 +1,5 @@
+import { LinkedTenantSelect } from "@/components/linked-tenant-select";
+import { useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +68,7 @@ function renterName(item: { firstName: string; lastName: string; organizationNam
 
 export default function PublicWorkspacePayments() {
   const [approvedQueue, setApprovedQueue] = useState<QueueListItem[]>([]);
+  const notificationLocation = useLocation();
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [selectedProof, setSelectedProof] = useState<{
@@ -128,8 +131,8 @@ export default function PublicWorkspacePayments() {
   }, []);
 
   useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+    void loadQueue(new URLSearchParams(notificationLocation.search).get("caseId") || undefined);
+  }, [loadQueue, notificationLocation.search]);
 
   useEffect(() => {
     void loadDetail(selectedId);
@@ -244,18 +247,7 @@ export default function PublicWorkspacePayments() {
           {!loading && approvedQueue.length ? (
             <div className="space-y-2">
               <Label>Tenant</Label>
-              <Select value={selectedId} onValueChange={setSelectedId}>
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Select tenant" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {approvedQueue.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LinkedTenantSelect items={approvedQueue} value={selectedId} onValueChange={setSelectedId} />
             </div>
           ) : null}
         </CardContent>

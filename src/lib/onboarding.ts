@@ -31,8 +31,8 @@ export function getRenterOnboarding(profile: {
     },
     {
       id: "identity",
-      title: "Submit identity for review",
-      description: "Submit your NIN or BVN so RentSure can review and approve it.",
+      title: "Add your identity details",
+      description: "Save your NIN or BVN to update your rent score automatically.",
       done: profile.identityReviewStatus === "APPROVED",
       href: "/account/renter/profile",
       actionLabel: "Submit identity"

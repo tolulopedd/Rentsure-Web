@@ -14,14 +14,15 @@ export type AppNotification = {
   createdAt: string;
 };
 
-export function listNotifications(limit = 50) {
-  return apiFetch<{ notifications: AppNotification[]; unreadCount: number }>(`/api/notifications?limit=${limit}`);
+export const NOTIFICATIONS_CHANGED = "rentsure:notifications-changed";
+export function listNotifications(limit = 50, offset = 0) {
+  return apiFetch<{ notifications: AppNotification[]; unreadCount: number; totalCount: number; hasMore: boolean }>(`/api/notifications?limit=${limit}&offset=${offset}`);
 }
-
-export function markNotificationRead(notificationId: string) {
-  return apiFetch<{ success: true }>(`/api/notifications/${notificationId}/read`, { method: "PATCH" });
+async function mutate(path: string, method: "PATCH" | "POST") {
+  const result = await apiFetch<{ success: true }>(path, { method });
+  window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED));
+  return result;
 }
-
-export function markAllNotificationsRead() {
-  return apiFetch<{ success: true }>("/api/notifications/read-all", { method: "POST" });
-}
+export function markNotificationRead(id: string) { return mutate(`/api/notifications/${id}/read`, "PATCH"); }
+export function markNotificationUnread(id: string) { return mutate(`/api/notifications/${id}/unread`, "PATCH"); }
+export function markAllNotificationsRead() { return mutate("/api/notifications/read-all", "POST"); }

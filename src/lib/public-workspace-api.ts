@@ -1,3 +1,4 @@
+import type { InformationResponse } from "./additional-information";
 import { apiFetch } from "@/lib/api";
 
 export type WorkspaceMembershipRole = "LANDLORD" | "AGENT";
@@ -145,6 +146,7 @@ export type LinkedRentScoreSummary = {
 
 export type QueueListItem = {
   id: string;
+  updatedAt: string;
   firstName: string;
   lastName: string;
   organizationName?: string | null;
@@ -259,6 +261,8 @@ export type QueueDetail = {
       lastOccurredAt?: string | null;
     }>;
   } | null;
+  requestedInformation: string[];
+  additionalInformationResponse: InformationResponse | null;
   decision: {
     decision: ProposedRenterDecision;
     decidedAt?: string | null;
@@ -672,6 +676,7 @@ export function decideWorkspaceProposedRenter(
   proposedRenterId: string,
   input: {
     decision: ProposedRenterDecision;
+    requestedInformation?: string[];
     note?: string;
   }
 ) {

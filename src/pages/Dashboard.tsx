@@ -461,4 +461,3 @@ function MetricCard({
     </div>
   );
 }
-

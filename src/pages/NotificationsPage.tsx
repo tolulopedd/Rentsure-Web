@@ -1,27 +1,45 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { useEffect, useState, useCallback } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { listNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from "@/lib/notifications-api";
+import { listNotifications, markAllNotificationsRead, markNotificationRead, markNotificationUnread, NOTIFICATIONS_CHANGED, type AppNotification } from "@/lib/notifications-api";
 
 export default function NotificationsPage() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const location = useLocation();
+  const [limit, setLimit] = useState(50);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    try {
+      const pages = await Promise.all(Array.from({ length: Math.ceil(limit / 50) }, (_, index) => listNotifications(50, index * 50)));
+      setItems(Array.from(new Map(pages.flatMap(page => page.notifications).map(item => [item.id, item])).values()));
+      setHasMore(pages[pages.length - 1].hasMore);
+      setError(false);
+    } catch { setError(true); }
+    finally { setLoading(false); }
+  }, [limit]);
   useEffect(() => {
-    void listNotifications().then((result) => setItems(result.notifications)).finally(() => setLoading(false));
-  }, []);
-
-  async function markRead(item: AppNotification) {
-    if (item.readAt) return;
-    await markNotificationRead(item.id);
-    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, readAt: new Date().toISOString() } : entry));
-  }
-
-  async function markAllRead() {
-    await markAllNotificationsRead();
-    setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt || new Date().toISOString() })));
+    void load();
+    const refresh = () => void load();
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener(NOTIFICATIONS_CHANGED, refresh);
+    return () => { clearInterval(timer); window.removeEventListener(NOTIFICATIONS_CHANGED, refresh); };
+  }, [load]);
+  async function changeRead(item?: AppNotification, open = false) {
+    setBusy(true);
+    try {
+      if (!item) await markAllNotificationsRead();
+      else if (!item.readAt || open) await markNotificationRead(item.id);
+      else await markNotificationUnread(item.id);
+      await load();
+    } catch { toast.error("Could not update notifications. Please try again."); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -29,12 +47,13 @@ export default function NotificationsPage() {
       <Card className="border-slate-200 bg-white">
         <CardHeader className="flex flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="icon"><Link to="/account"><ArrowLeft className="h-4 w-4" /></Link></Button>
+            <Button asChild variant="ghost" size="icon"><Link to={location.pathname.startsWith("/app/") ? "/app" : "/account"}><ArrowLeft className="h-4 w-4" /></Link></Button>
             <CardTitle>Notifications</CardTitle>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void markAllRead()}>Mark all read</Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void changeRead()}>Mark all read</Button>
         </CardHeader>
         <CardContent className="space-y-3">
+          {error ? <p role="alert" className="text-sm text-rose-600">Notifications could not load. <button onClick={() => void load()}>Retry</button></p> : null}
           {loading ? <p className="text-sm text-slate-500">Loading notifications...</p> : null}
           {!loading && !items.length ? <p className="text-sm text-slate-500">No notifications yet.</p> : null}
           {items.map((item) => (
@@ -46,12 +65,13 @@ export default function NotificationsPage() {
                   <p className="mt-2 text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  {item.ctaPath ? <Button asChild size="sm" variant="outline" onClick={() => void markRead(item)}><Link to={item.ctaPath}>{item.ctaLabel || "Open"}</Link></Button> : null}
-                  {!item.readAt ? <Button type="button" size="sm" variant="ghost" onClick={() => void markRead(item)}>Mark read</Button> : null}
+                  {item.ctaPath ? <Button asChild size="sm" variant="outline" onClick={() => void changeRead(item, true)}><Link to={item.ctaPath}>{item.ctaLabel || "Open"}</Link></Button> : null}
+                  <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => void changeRead(item)}>{item.readAt ? "Mark unread" : "Mark read"}</Button>
                 </div>
               </div>
             </div>
           ))}
+          {hasMore ? <Button variant="outline" onClick={() => setLimit(value => value + 50)}>Load more</Button> : null}
         </CardContent>
       </Card>
     </main>

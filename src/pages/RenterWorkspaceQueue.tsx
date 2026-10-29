@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import { applicationDecisionLabel } from "@/lib/additional-information";
+import { InformationRequestStatus } from "@/components/information-request-status";
+import { RenterInformationForm } from "@/components/additional-information";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, ClipboardList, Clock3, ScrollText } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,9 +20,11 @@ import {
 } from "@/lib/renter-workspace-presenters";
 
 export default function RenterWorkspaceQueue() {
-  const { data, acceptScoreRequest } = useRenterWorkspace();
+  const { data, acceptScoreRequest, refresh } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
   const [selectedId, setSelectedId] = useState("");
+  const location = useLocation();
+  useEffect(() => { const id = new URLSearchParams(location.search).get("caseId"); if (id) setSelectedId(id); }, [location.search]);
 
   const selectedItem = useMemo(
     () => linkedCases.find((item) => item.id === selectedId) || null,
@@ -114,8 +119,9 @@ export default function RenterWorkspaceQueue() {
                     </div>
                     <div className="text-left lg:text-right">
                       <Badge className={decisionBadgeClass(selectedItem.decision || selectedItem.status)} variant="outline">
-                        {selectedItem.decision || selectedItem.status}
+                        {applicationDecisionLabel(selectedItem.decision || selectedItem.status, selectedItem.additionalInformationResponse, selectedItem.requestedInformation)}
                       </Badge>
+                          {selectedItem.decision === "HOLD" && <InformationRequestStatus caseId={selectedItem.id} requestedInformation={selectedItem.requestedInformation} response={selectedItem.additionalInformationResponse} renter />}
                       <p className="mt-2 text-xs text-muted-foreground">
                         Property link: {selectedItem.renterLinkResponseStatus.replaceAll("_", " ")}
                       </p>
@@ -123,6 +129,8 @@ export default function RenterWorkspaceQueue() {
                     </div>
                   </div>
                 </div>
+
+                {selectedItem.decision === "HOLD" && !!selectedItem.requestedInformation?.length && <RenterInformationForm key={selectedItem.id + selectedItem.informationRequestedAt} item={selectedItem} refresh={refresh} />}
 
                 <div className="grid gap-3 md:grid-cols-3">
                   <MiniCard label="Score requests" value={String(selectedItem.scoreRequests.length)} />
@@ -278,4 +286,3 @@ function MiniCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Building2, ChevronDown, ClipboardCheck, CreditCard, LayoutDashboard, LogOut, UserCircle2 } from "lucide-react";
+import { Bell, Mail, Building2, ChevronDown, ClipboardCheck, CreditCard, LayoutDashboard, LogOut, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export function PublicWorkspaceSidebar() {
     { label: "Properties & Units", icon: Building2, items: [{ label: "Properties", to: "/account/properties" }, { label: "Link Tenant", to: "/account/queue" }] },
     { label: "Applications & Tenancies", icon: ClipboardCheck, items: [{ label: "Landlord Decision", to: "/account/decisions" }] },
     { label: "Payments", icon: CreditCard, items: [{ label: "Payment Schedules", to: "/account/payments" }] },
+    ...(userRole === "LANDLORD" ? [{ label: "Messages", icon: Mail, items: [{ label: "Conversations", to: "/account/messages" }] }] : []),
     { label: "Notifications", icon: Bell, items: [{ label: "Notification History", to: "/account/notifications" }] }
   ];
 

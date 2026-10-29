@@ -1,3 +1,5 @@
+import { MessagingShortcut } from "@/components/messaging-shortcut";
+import { NotificationBell } from "@/components/notification-bell";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu, User, LogOut } from "lucide-react";
@@ -58,6 +60,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
         </div>
 
         <div className="flex items-center gap-3">
+          {isAdmin ? <MessagingShortcut path="/app/messages" /> : null}
+          {isAdmin ? <NotificationBell historyPath="/app/notifications" /> : null}
           <div className="hidden flex-col items-end px-2 md:flex">
             <span className="text-sm text-muted-foreground">Nigerian Time</span>
             <span className="text-xs font-medium leading-tight text-[var(--rentsure-blue)]">{ngTime}</span>

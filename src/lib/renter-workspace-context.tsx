@@ -184,7 +184,7 @@ export function RenterWorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const response = await submitRenterIdentityForReview(input);
       setData(response);
-      toast.success(`${input.verificationType} submitted for review`);
+      toast.success(`${input.verificationType} updated and rent score recalculated`);
       return true;
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, `Failed to submit ${input.verificationType}`));

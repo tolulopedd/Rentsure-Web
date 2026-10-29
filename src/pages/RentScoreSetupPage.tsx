@@ -192,7 +192,7 @@ export default function RentScoreSetupPage() {
         maxScore: Number(draft.maxScore)
       });
       await loadSetup(category.code);
-      toast.success("Category updated");
+      toast.success("Category updated. All renter scores now use the current metrics.");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to update category"));
     } finally {
@@ -224,7 +224,7 @@ export default function RentScoreSetupPage() {
         points: Number(draft.points)
       });
       await loadSetup(rule.categoryCode);
-      toast.success("Point row updated");
+      toast.success("Point row updated. All renter scores now use the current metrics.");
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to update point row"));
     } finally {
@@ -458,4 +458,3 @@ export default function RentScoreSetupPage() {
     </div>
   );
 }
-

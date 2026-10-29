@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Bell,
+  Bell, Mail,
   ChevronDown,
   ClipboardCheck,
   CreditCard,
@@ -40,7 +40,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     { label: "Properties & Units", icon: Building2, items: [{ label: "Landlord & Agent Activities", to: "/app/landlord-agent-activities" }] },
     { label: "Applications & Tenancies", icon: FileStack, items: [{ label: "Unregistered Requests", to: "/app/unregistered-requests" }, { label: "Renter Activities", to: "/app/renter-activities" }] },
     { label: "Payments", icon: CreditCard, items: [{ label: "Payment Activity", to: "/app/renter-activities" }] },
-    { label: "Notifications", icon: Bell, items: [{ label: "Renter Notifications", to: "/app/renter-activities" }, { label: "Landlord & Agent Notifications", to: "/app/landlord-agent-activities" }] },
+    { label: "Messages", icon: Mail, items: [{ label: "Conversations", to: "/app/messages" }] },
+    { label: "Notifications", icon: Bell, items: [{ label: "Notification History", to: "/app/notifications" }, { label: "Renter Notifications", to: "/app/renter-activities" }, { label: "Landlord & Agent Notifications", to: "/app/landlord-agent-activities" }] },
     { label: "Support", icon: ClipboardCheck, items: [{ label: "Renter Activities", to: "/app/renter-activities" }] },
     { label: "User Management", icon: UserCircle2, items: [{ label: "Users & Admins", to: "/app/users" }] },
     { label: "RentScore Settings", icon: SlidersHorizontal, items: [{ label: "Score Rules", to: "/app/rent-score-setup" }] }

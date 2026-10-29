@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:information-status": "node scripts/test-information-status.cjs"
   },
   "dependencies": {
     "@rentsure/design-tokens": "file:packages/design-tokens",

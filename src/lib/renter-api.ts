@@ -1,3 +1,4 @@
+import type { InformationResponse } from "./additional-information";
 import { apiFetch } from "@/lib/api";
 
 export type RenterDashboardResponse = {
@@ -128,6 +129,9 @@ export type RenterDashboardResponse = {
     renterLinkResponseNote?: string | null;
     decision?: string | null;
     decisionNote?: string | null;
+    informationRequestedAt: string | null;
+    requestedInformation: string[];
+    additionalInformationResponse: InformationResponse | null;
     property: {
       id: string;
       name: string;

@@ -23,4 +23,3 @@ export function exportCustomers(params: Record<string, string | undefined>) {
   Object.entries(params).forEach(([key, value]) => value && query.set(key, value));
   return apiFetch<string>(`/api/admin/customers/export?${query.toString()}`, { headers: { Accept: "text/csv" } });
 }
-

@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
+import { Bell, Mail, ChevronDown, ClipboardList, CreditCard, LayoutDashboard, ListChecks, LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -18,6 +18,7 @@ export function RenterWorkspaceSidebar() {
     { label: "Applications & Tenancies", icon: ListChecks, items: [{ label: "Landlord Decision", to: "/account/renter/queue" }] },
     { label: "Payments", icon: CreditCard, items: [{ label: "Payments and Proof", to: "/account/renter/payments" }] },
     { label: "RentScore", icon: ShieldCheck, items: [{ label: "Your Rent Score", to: "/account/renter/buy-score" }, { label: "Share Rent Score", to: "/account/renter/share-score" }] },
+    { label: "Messages", icon: Mail, items: [{ label: "Conversations", to: "/account/messages" }] },
     { label: "Notifications", icon: Bell, items: [{ label: "Notification History", to: "/account/notifications" }] }
   ];
 

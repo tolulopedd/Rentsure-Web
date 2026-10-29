@@ -74,7 +74,7 @@ export default function RenterWorkspaceProfile() {
   const organizationName = profile.organizationName;
   const phoneError = profileDraft.phone.trim() && !isValidNigeriaPhone(profileDraft.phone) ? nigeriaPhoneMessage() : "";
   const approvedIdentityType = profile.identityReviewStatus === "APPROVED" ? profile.identityVerificationType ?? null : null;
-  const activeIdentityType = (approvedIdentityType ?? profile.identityVerificationType ?? selectedIdentityType) as "NIN" | "BVN";
+  const activeIdentityType = (approvedIdentityType ?? selectedIdentityType) as "NIN" | "BVN";
   const onboarding = useMemo(() => getRenterOnboarding(profile), [profile]);
   const showOnboarding = searchParams.get("onboarding") === "1" || !onboarding.isComplete;
 
@@ -353,7 +353,7 @@ export default function RenterWorkspaceProfile() {
                       }`}
                     >
                       <div className="font-semibold">{item}</div>
-                      <div className="mt-1 text-xs text-current/80">Submit your {item} for review.</div>
+                      <div className="mt-1 text-xs text-current/80">Update your rent score automatically.</div>
                     </button>
                   ))}
                 </div>
@@ -362,9 +362,7 @@ export default function RenterWorkspaceProfile() {
                 label={activeIdentityType}
                 value={activeIdentityType === "NIN" ? nin : bvn}
                 onChange={activeIdentityType === "NIN" ? setNin : setBvn}
-                reviewStatus={profile.identityReviewStatus || "NOT_SUBMITTED"}
-                submittedAt={profile.identitySubmittedAt}
-                reviewedAt={profile.identityReviewedAt}
+                reviewStatus={profile.identityVerificationType === activeIdentityType ? profile.identityReviewStatus || "NOT_SUBMITTED" : "NOT_SUBMITTED"}
                 reviewComment={profile.identityReviewComment}
                 loading={identitySaving === activeIdentityType}
                 onSubmit={() => void submitIdentity(activeIdentityType)}
@@ -458,8 +456,6 @@ function IdentityBlock({
   value,
   onChange,
   reviewStatus,
-  submittedAt,
-  reviewedAt,
   reviewComment,
   loading,
   onSubmit
@@ -468,15 +464,12 @@ function IdentityBlock({
   value: string;
   onChange: (value: string) => void;
   reviewStatus: "NOT_SUBMITTED" | "PENDING" | "APPROVED" | "FAILED";
-  submittedAt?: string | null;
-  reviewedAt?: string | null;
   reviewComment?: string | null;
   loading: boolean;
   onSubmit: () => void;
 }) {
   const isApproved = reviewStatus === "APPROVED";
-  const isPending = reviewStatus === "PENDING";
-  const isFailed = reviewStatus === "FAILED";
+  const needsUpdate = reviewStatus === "PENDING" || reviewStatus === "FAILED";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -484,20 +477,12 @@ function IdentityBlock({
         <div>
           <p className="font-semibold text-slate-950">{label} validation</p>
           <p className="text-sm text-slate-600">
-            {isApproved
-              ? `Approved on ${formatDate(reviewedAt)}`
-              : isPending
-                ? `Submitted on ${formatDate(submittedAt)} and awaiting admin review.`
-                : isFailed
-                  ? "Update the information below and submit it again for review."
-                  : `Enter your ${label} and submit it for review.`}
+            Save your 11-digit {label} to update your rent score automatically.
           </p>
         </div>
         {isApproved ? (
           <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">Verified</Badge>
-        ) : isPending ? (
-          <Badge variant="outline">Pending review</Badge>
-        ) : isFailed ? (
+        ) : needsUpdate ? (
           <Badge className="border-rose-200 bg-rose-50 text-rose-700">Update needed</Badge>
         ) : (
           <Badge variant="outline">Not submitted</Badge>
@@ -505,27 +490,20 @@ function IdentityBlock({
       </div>
       {isApproved ? (
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Your {label} has been approved and stored securely. It is no longer shown here.
+          Your {label} has been saved and your rent score updated. You can replace it below.
         </div>
-      ) : isPending ? (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          Your submission is with RentSure for review. You will receive a notification when it has been approved or if it needs changes.
+      ) : null}
+      {reviewStatus === "FAILED" && reviewComment ? (
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {reviewComment}
         </div>
-      ) : (
-        <>
-          {isFailed && reviewComment ? (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {reviewComment}
-            </div>
-          ) : null}
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
-            <Button variant="outline" onClick={onSubmit} disabled={loading}>
-              {loading ? "Submitting..." : `Submit ${label}`}
-            </Button>
-          </div>
-        </>
-      )}
+      ) : null}
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={`Enter ${label}`} className="bg-white" />
+        <Button variant="outline" onClick={onSubmit} disabled={loading}>
+          {loading ? "Saving..." : `Save ${label}`}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -549,4 +527,3 @@ function InfoTile({
     </div>
   );
 }
-

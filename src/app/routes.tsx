@@ -35,9 +35,18 @@ import RenterWorkspacePayments from "@/pages/RenterWorkspacePayments";
 import RenterWorkspaceProfile from "@/pages/RenterWorkspaceProfile";
 import RenterWorkspaceBuyScore from "@/pages/RenterWorkspaceBuyScore";
 import RenterWorkspaceShareScore from "@/pages/RenterWorkspaceShareScore";
+import MessagesPage from "@/pages/MessagesPage";
 import NotificationsPage from "@/pages/NotificationsPage";
 import { AccountIndexRedirect, AdminRoute, AppIndexRedirect, PublicWorkspaceRoute, RenterWorkspaceRoute } from "@/app/route-guards";
 import { canAccessPublicWorkspace } from "@/lib/roles";
+
+function MessagesWorkspaceRoute() {
+  if (localStorage.getItem("accountScope") !== "PUBLIC") return <Navigate to="/app" replace />;
+  const role = (localStorage.getItem("userRole") || "").toUpperCase();
+  if (role === "LANDLORD") return <PublicWorkspaceLayout><MessagesPage /></PublicWorkspaceLayout>;
+  if (role === "RENTER") return <RenterWorkspaceLayout><MessagesPage /></RenterWorkspaceLayout>;
+  return <Navigate to="/account" replace />;
+}
 
 function NotificationsWorkspaceRoute() {
   return canAccessPublicWorkspace()
@@ -59,6 +68,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <AccountIndexRedirect /> },
       { path: "notifications", element: <NotificationsWorkspaceRoute /> },
+      { path: "messages", element: <MessagesWorkspaceRoute /> },
       { path: "home", element: <AccountHome /> },
       { path: "renter-dashboard", element: <Navigate to="/account/renter/dashboard" replace /> },
       {
@@ -99,6 +109,8 @@ export const router = createBrowserRouter([
           { index: true, element: <AppIndexRedirect /> },
           { path: "dashboard", element: <Dashboard /> },
           { path: "unregistered-requests", element: <AdminRoute element={<AdminUnregisteredRequestsPage />} /> },
+          { path: "notifications", element: <AdminRoute element={<NotificationsPage />} /> },
+          { path: "messages", element: <AdminRoute element={<MessagesPage />} /> },
           { path: "identity-reviews", element: <AdminRoute element={<AdminIdentityReviewsPage />} /> },
           { path: "renter-activities", element: <AdminRoute element={<AdminRenterActivitiesPage />} /> },
           { path: "landlord-agent-activities", element: <AdminRoute element={<AdminLandlordAgentActivitiesPage />} /> },
@@ -133,4 +145,3 @@ export const router = createBrowserRouter([
     ]
   }
 ]);
-

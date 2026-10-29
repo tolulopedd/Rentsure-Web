@@ -27,7 +27,7 @@ export function PublicWorkspaceLayout({ children }: { children?: ReactNode }) {
           <PublicWorkspaceSidebar />
         </aside>
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <PublicWorkspaceTopbar />
           <div className="border-b border-slate-200 bg-white px-2.5 py-2.5 md:hidden">
             <div className="flex items-center justify-between gap-2">
@@ -38,6 +38,7 @@ export function PublicWorkspaceLayout({ children }: { children?: ReactNode }) {
                 { label: "Link Tenant", mobileLabel: "Link", to: "/account/queue" },
                 { label: "Landlord Decision", mobileLabel: "Decision", to: "/account/decisions" },
                 { label: "Payments", mobileLabel: "Payments", to: "/account/payments" },
+                ...((localStorage.getItem("userRole") || "").toUpperCase() === "LANDLORD" ? [{ label: "Messages", mobileLabel: "Messages", to: "/account/messages" }] : []),
                 { label: "Notifications", mobileLabel: "Alerts", to: "/account/notifications" },
                 { label: "Profile", mobileLabel: "Profile", to: "/account/profile" }
               ].map((item) => (

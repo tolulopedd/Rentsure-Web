@@ -1,11 +1,18 @@
+import { createRentScoreReport } from "@/lib/rent-score-report";
+import { RentScoreReportViewer } from "@/components/rent-score-report-viewer";
+import { applicationDecisionLabel, awaitingRenterInformation } from "@/lib/additional-information";
+import { InformationRequestStatus } from "@/components/information-request-status";
+import { INFORMATION_OPTIONS } from "@/lib/additional-information";
+import { InformationResponseDetail } from "@/components/additional-information";
+import { useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Download, PauseCircle, Send, ShieldCheck, ShieldX } from "lucide-react";
+import { ArrowRight, Eye, PauseCircle, Send, ShieldCheck, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LinkedTenantSelect } from "@/components/linked-tenant-select";
 import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage } from "@/lib/errors";
 import { occupancyLabel, propertyDisplayName, propertyUnitDisplayName } from "@/lib/property-display";
@@ -29,9 +36,6 @@ function formatDate(value?: string | null) {
   return date.toLocaleDateString();
 }
 
-function formatNgn(value: number) {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(value);
-}
 
 function renterName(item: { firstName: string; lastName: string; organizationName?: string | null }) {
   return item.organizationName || [item.firstName, item.lastName].filter(Boolean).join(" ");
@@ -77,19 +81,15 @@ function DetailPair({ label, value }: { label: string; value: string }) {
   );
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 export default function PublicWorkspaceDecisions() {
+  const [report, setReport] = useState<ReturnType<typeof createRentScoreReport>>(null);
   const [queue, setQueue] = useState<QueueListItem[]>([]);
+  const notificationLocation = useLocation();
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
+  const [requestedInformation, setRequestedInformation] = useState<string[]>([]);
+  const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionNote, setDecisionNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -132,7 +132,7 @@ export default function PublicWorkspaceDecisions() {
       }
       const response = await getWorkspaceQueueItem(id);
       setDetail(response);
-      setDecisionNote(response.decision?.note || "");
+      if (!input?.silent) { setDecisionNote(response.decision?.note || ""); setRequestedInformation(response.requestedInformation || []); }
     } catch (error: unknown) {
       if (!input?.silent) {
         toast.error(getErrorMessage(error, "Failed to load queue detail"));
@@ -145,8 +145,8 @@ export default function PublicWorkspaceDecisions() {
   }, []);
 
   useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+    void loadQueue(new URLSearchParams(notificationLocation.search).get("caseId") || undefined);
+  }, [loadQueue, notificationLocation.search]);
 
   useEffect(() => {
     void loadDetail(selectedId);
@@ -167,7 +167,7 @@ export default function PublicWorkspaceDecisions() {
   );
 
   async function requestRentScore() {
-    if (!detail) return;
+    if (!detail || !canRequestScore) return;
     try {
       await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadQueue(detail.id);
@@ -190,11 +190,17 @@ export default function PublicWorkspaceDecisions() {
     }
   }
 
+  const informationPending = awaitingRenterInformation(detail?.decision?.decision, detail?.additionalInformationResponse, detail?.requestedInformation);
+  const decisionsDisabled = decisionBusy || informationPending || Boolean(detail?.decision && detail.decision.decision !== "HOLD");
+
   async function takeDecision(decision: ProposedRenterDecision) {
-    if (!detail) return;
+    if (!detail || decisionsDisabled) return;
+    if (decision === "HOLD" && !requestedInformation.length) { toast.error("Select at least one item to request"); return; }
+    setDecisionBusy(true);
     try {
       await decideWorkspaceProposedRenter(detail.id, {
         decision,
+        requestedInformation: decision === "HOLD" ? requestedInformation : [],
         note: decisionNote.trim() || undefined
       });
       await loadQueue(detail.id);
@@ -202,122 +208,20 @@ export default function PublicWorkspaceDecisions() {
       toast.success(`Renter marked as ${decisionLabel(decision).toLowerCase()}`);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "Failed to save landlord decision"));
-    }
+    } finally { setDecisionBusy(false); }
   }
 
-  function downloadReport() {
-    if (!detail || !detail.linkedRentScoreReport) return;
-    const renter = renterName(detail);
-    const currentDecisionLabel = decisionLabel(detail.decision?.decision);
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>RentSure Report - ${escapeHtml(renter)}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 32px; color: #0f172a; }
-            h1, h2, h3 { margin: 0 0 12px; }
-            .hero { padding: 24px; border: 1px solid #dbe4f3; border-radius: 18px; background: linear-gradient(135deg, #ffffff, #eef5ff); }
-            .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
-            .card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; }
-            .section { margin-top: 24px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-            th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; font-size: 13px; }
-            th { background: #f8fafc; }
-            ul { padding-left: 18px; }
-          </style>
-        </head>
-        <body>
-          <div class="hero">
-            <h1>Rent score report</h1>
-            <p><strong>Proposed renter:</strong> ${escapeHtml(renter)}</p>
-            <p><strong>Property:</strong> ${escapeHtml(propertyDisplayName(detail.property))}</p>
-            <p><strong>Unit:</strong> ${escapeHtml(
-              detail.propertyUnit
-                ? `${propertyUnitDisplayName(detail.propertyUnit)} · ${occupancyLabel(detail.propertyUnit.isOccupied)}`
-                : propertyUnitDisplayName(detail.propertyUnit)
-            )}</p>
-            <p><strong>Property address:</strong> ${escapeHtml(detail.property.address)}, ${escapeHtml(detail.property.city)}, ${escapeHtml(detail.property.state)}</p>
-            <p><strong>Landlord decision:</strong> ${escapeHtml(currentDecisionLabel)}</p>
-          </div>
-          <div class="meta">
-            <div class="card">
-              <h3>Renter details</h3>
-              <p><strong>Email:</strong> ${escapeHtml(detail.email)}</p>
-              <p><strong>Phone:</strong> ${escapeHtml(detail.phone)}</p>
-              <p><strong>Address:</strong> ${escapeHtml(detail.address || "Profile information pending")}</p>
-            </div>
-            <div class="card">
-              <h3>Decision details</h3>
-            <p><strong>Status:</strong> ${escapeHtml(decisionLabel(detail.status))}</p>
-              <p><strong>Decision note:</strong> ${escapeHtml(detail.decision?.note || "No note added")}</p>
-              <p><strong>Generated:</strong> ${escapeHtml(new Date().toLocaleString())}</p>
-            </div>
-          </div>
-          <div class="section">
-            <h3>Rent Score Summary</h3>
-            <p><strong>Score:</strong> ${detail.linkedRentScoreReport.summary.score} / ${detail.linkedRentScoreReport.summary.maxScore}</p>
-            <p><strong>Band:</strong> ${rentScoreBandLabel(detail.linkedRentScoreReport.summary.scoreBand)}</p>
-            <p><strong>Positive points:</strong> ${detail.linkedRentScoreReport.summary.positivePoints}</p>
-            <p><strong>Negative points:</strong> ${detail.linkedRentScoreReport.summary.negativePoints}</p>
-            <p><strong>Policy:</strong> ${escapeHtml(detail.linkedRentScoreReport.policy.name)}</p>
-          </div>
-          <div class="section">
-            <h3>Rule Breakdown</h3>
-            <table>
-              <thead>
-                <tr><th>Rule</th><th>Points</th><th>Applied</th><th>Contribution</th></tr>
-              </thead>
-              <tbody>
-                ${detail.linkedRentScoreReport.breakdown
-                  .map(
-                    (item) => `
-                      <tr>
-                        <td>${escapeHtml(item.name)}</td>
-                        <td>${item.points}</td>
-                        <td>${item.appliedOccurrences}</td>
-                        <td>${item.contribution}</td>
-                      </tr>
-                    `
-                  )
-                  .join("")}
-              </tbody>
-            </table>
-          </div>
-          <div class="section">
-            <h3>Payment schedules</h3>
-            ${
-              detail.paymentSchedules.length
-                ? `<ul>${detail.paymentSchedules
-                    .map(
-                      (schedule) =>
-                        `<li>${escapeHtml(schedule.paymentType.replaceAll("_", " "))}: ${escapeHtml(formatNgn(schedule.amountNgn))} due ${escapeHtml(
-                          formatDate(schedule.dueDate)
-                        )} (${escapeHtml(schedule.status)})</li>`
-                    )
-                    .join("")}</ul>`
-                : "<p>No payment schedules have been logged yet.</p>"
-            }
-          </div>
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${renter.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-rentsure-report.html`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  function viewReport() {
+    if (!detail || !isLandlord) return;
+    setReport(createRentScoreReport(detail));
   }
 
-  const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
+  const canRequestScore = Boolean(detail && detail.renterLinkResponseStatus === "ACCEPTED" && !detail.scoreRequests.length);
   const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
 
   return (
     <div className="space-y-4 md:space-y-6">
+      <RentScoreReportViewer report={report} onClose={() => setReport(null)} />
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-950 md:text-2xl">Landlord Decision</h1>
       </div>
@@ -333,18 +237,7 @@ export default function PublicWorkspaceDecisions() {
             {!loading && queue.length ? (
               <div className="space-y-2">
                 <Label>Linked tenant</Label>
-                <Select value={selectedId} onValueChange={setSelectedId}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Select linked tenant" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {queue.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LinkedTenantSelect items={queue} value={selectedId} onValueChange={setSelectedId} />
               </div>
             ) : null}
           </CardContent>
@@ -362,11 +255,12 @@ export default function PublicWorkspaceDecisions() {
               <>
                     <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                       <div className="space-y-4">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
                           <p className="font-semibold text-slate-950">{renterName(detail)}</p>
                           <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
-                            {decisionLabel(detail.decision?.decision || detail.status)}
+                            {applicationDecisionLabel(detail.decision?.decision || detail.status, detail.additionalInformationResponse, detail.requestedInformation)}
                           </Badge>
+                          {detail.decision?.decision === "HOLD" && <InformationRequestStatus caseId={detail.id} requestedInformation={detail.requestedInformation} response={detail.additionalInformationResponse} />}
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <DetailPair label="Email" value={detail.email} />
@@ -457,11 +351,13 @@ export default function PublicWorkspaceDecisions() {
                         <Button
                           onClick={() => void requestRentScore()}
                           disabled={!canRequestScore}
-                          className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]"
+                          title={detail.renterLinkResponseStatus !== "ACCEPTED" ? "Awaiting renter acceptance of the property link" : undefined}
+                          className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100"
                         >
                           <ArrowRight className="mr-2 h-4 w-4" />
                           {requestButtonLabel}
                         </Button>
+                        {detail.renterLinkResponseStatus !== "ACCEPTED" ? <p role="status" className="w-full text-sm text-slate-500">The renter must accept the property link before you can request a rent score.</p> : null}
                         {isAgent ? (
                           <Button
                             variant="outline"
@@ -473,9 +369,9 @@ export default function PublicWorkspaceDecisions() {
                           </Button>
                         ) : null}
                         {!isAgent ? (
-                          <Button variant="outline" onClick={downloadReport} disabled={!detail.linkedRentScoreReport}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download report
+                          <Button variant="outline" onClick={viewReport} disabled={!detail.linkedRentScoreReport}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View report
                           </Button>
                         ) : null}
                       </div>
@@ -484,7 +380,7 @@ export default function PublicWorkspaceDecisions() {
                     {detail.decision ? (
                       <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                         <div className="space-y-2 text-sm text-slate-600">
-                          <SummaryRow label="Decision" value={detail.decision.decision} />
+                          <SummaryRow label="Decision" value={applicationDecisionLabel(detail.decision.decision, detail.additionalInformationResponse, detail.requestedInformation)} />
                           <SummaryRow
                             label="By"
                             value={detail.decision.decidedBy?.name || "Decision maker not captured"}
@@ -493,6 +389,8 @@ export default function PublicWorkspaceDecisions() {
                             label="Date"
                             value={detail.decision.decidedAt ? formatDate(detail.decision.decidedAt) : "-"}
                           />
+                          {!!detail.requestedInformation?.length && <SummaryRow label="Requested information" value={detail.requestedInformation.join(", ")} />}
+                          <InformationResponseDetail response={detail.additionalInformationResponse} />
                           <SummaryRow label="Note" value={detail.decision.note || "No note added."} />
                         </div>
                       </div>
@@ -501,7 +399,7 @@ export default function PublicWorkspaceDecisions() {
                     {isLandlord ? (
                       <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 md:px-4 md:py-4">
                         {!detail.linkedRentScoreReport ? <p className="text-sm text-slate-500">Rent score not available yet.</p> : null}
-                        {detail.decision ? <p className="text-sm text-slate-500">Decision recorded.</p> : null}
+                        {detail.decision && detail.decision.decision !== "HOLD" ? <p className="text-sm text-slate-500">Decision recorded.</p> : null}
                         <div className="space-y-2">
                           <Label>Decision note</Label>
                           <Textarea
@@ -509,31 +407,41 @@ export default function PublicWorkspaceDecisions() {
                             onChange={(event) => setDecisionNote(event.target.value)}
                             placeholder="Add a decision note"
                             className="bg-white"
-                            disabled={Boolean(detail.decision)}
+                            disabled={decisionsDisabled}
                           />
                         </div>
+                        <fieldset className="mt-4 space-y-2" disabled={decisionsDisabled}>
+                          <legend className="text-sm font-medium">Information to request from the renter</legend>
+                          <p className="text-xs text-slate-500">Select one or more items. The renter will receive these selections in their notification and email.</p>
+                          {INFORMATION_OPTIONS.map(option => <label key={option} className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                            <input type="checkbox" checked={requestedInformation.includes(option)} onChange={event => setRequestedInformation(current => event.target.checked ? [...current, option] : current.filter(value => value !== option))} />
+                            {option}
+                          </label>)}
+                        </fieldset>
+                        <p role="status" className="mt-3 text-sm text-slate-500">{informationPending ? "Awaiting renter information. Decision buttons will be available after the renter submits all requested items." : null}</p>
                         <div className="mt-4 flex flex-wrap gap-3">
                           <Button
                             onClick={() => void takeDecision("APPROVED")}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            disabled={Boolean(detail.decision)}
+                            className="bg-emerald-600 hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:border-slate-200 disabled:text-slate-500 disabled:opacity-100"
+                            disabled={decisionsDisabled}
                           >
                             <ShieldCheck className="mr-2 h-4 w-4" />
                             Approve
                           </Button>
                           <Button
                             variant="outline"
+                            className="disabled:cursor-not-allowed disabled:bg-slate-200 disabled:border-slate-200 disabled:text-slate-500 disabled:opacity-100"
                             onClick={() => void takeDecision("HOLD")}
-                            disabled={Boolean(detail.decision)}
+                            disabled={decisionsDisabled}
                           >
                             <PauseCircle className="mr-2 h-4 w-4" />
                             Request for additional information
                           </Button>
                           <Button
                             variant="outline"
-                            className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                            className="border-rose-200 text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:border-slate-200 disabled:text-slate-500 disabled:opacity-100"
                             onClick={() => void takeDecision("DECLINED")}
-                            disabled={Boolean(detail.decision)}
+                            disabled={decisionsDisabled}
                           >
                             <ShieldX className="mr-2 h-4 w-4" />
                             Decline
@@ -580,4 +488,3 @@ export default function PublicWorkspaceDecisions() {
     </div>
   );
 }
-

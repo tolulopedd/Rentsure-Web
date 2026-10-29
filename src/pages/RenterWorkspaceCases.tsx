@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { applicationDecisionLabel } from "@/lib/additional-information";
+import { InformationRequestStatus } from "@/components/information-request-status";
+import { useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { Building2, Clock3, ScrollText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +21,9 @@ import {
 export default function RenterWorkspaceCases() {
   const { data, requestLandlordReference, respondToLinkedProperty } = useRenterWorkspace();
   const linkedCases = data?.linkedCases || [];
+  const notificationLocation = useLocation();
   const [selectedId, setSelectedId] = useState("");
+  useEffect(() => { const id = new URLSearchParams(notificationLocation.search).get("caseId"); if (id) setSelectedId(id); }, [notificationLocation.search]);
   const [referenceNote, setReferenceNote] = useState("");
 
   const selectedCase = useMemo(
@@ -107,8 +112,9 @@ export default function RenterWorkspaceCases() {
                     </div>
                     <div className="text-right">
                       <Badge className={decisionBadgeClass(selectedCase.decision || selectedCase.status)} variant="outline">
-                        {selectedCase.decision || selectedCase.status}
+                        {applicationDecisionLabel(selectedCase.decision || selectedCase.status, selectedCase.additionalInformationResponse, selectedCase.requestedInformation)}
                       </Badge>
+                          {selectedCase.decision === "HOLD" && <InformationRequestStatus caseId={selectedCase.id} requestedInformation={selectedCase.requestedInformation} response={selectedCase.additionalInformationResponse} renter />}
                       {selectedCase.decisionNote ? <p className="mt-2 max-w-xs text-sm text-slate-600 lg:ml-auto">{selectedCase.decisionNote}</p> : null}
                     </div>
                   </div>
@@ -310,4 +316,3 @@ function MiniCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

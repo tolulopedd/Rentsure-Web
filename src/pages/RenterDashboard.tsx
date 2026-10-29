@@ -141,7 +141,7 @@ export default function RenterDashboard() {
         value: type === "NIN" ? nin : bvn
       });
       setData(response);
-      toast.success(`${type} submitted for review`);
+      toast.success(`${type} updated and rent score recalculated`);
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, `Failed to submit ${type}`));
     } finally {

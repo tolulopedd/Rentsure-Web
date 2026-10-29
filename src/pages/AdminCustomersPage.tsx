@@ -79,4 +79,3 @@ export default function AdminCustomersPage() {
     </CardContent></Card>
   </div>;
 }
-

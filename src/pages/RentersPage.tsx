@@ -123,6 +123,32 @@ export default function RentersPage() {
     void loadDetail(selectedId);
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!query.trim()) return;
+    let cancelled = false;
+    let running = false;
+    const refreshScores = async () => {
+      if (document.hidden || running) return;
+      running = true;
+      try {
+        const [list, snapshot] = await Promise.all([
+          listRenterScores({ q: query.trim(), status }),
+          selectedId ? getRenterScoreDetails(selectedId) : Promise.resolve(null)
+        ]);
+        if (!cancelled) { setItems(list.items); if (selectedId) setDetail(snapshot); }
+      } catch { /* Preserve the last view on a background refresh failure. */ }
+      finally { running = false; }
+    };
+    const timer = window.setInterval(() => void refreshScores(), 12000);
+    window.addEventListener("focus", refreshScores);
+    document.addEventListener("visibilitychange", refreshScores);
+    return () => {
+      cancelled = true; clearInterval(timer);
+      window.removeEventListener("focus", refreshScores);
+      document.removeEventListener("visibilitychange", refreshScores);
+    };
+  }, [query, status, selectedId]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -281,4 +307,3 @@ export default function RentersPage() {
     </div>
   );
 }
-

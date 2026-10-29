@@ -1,3 +1,8 @@
+import { applicationDecisionLabel } from "@/lib/additional-information";
+import { InformationRequestStatus } from "@/components/information-request-status";
+import { SearchableSelect } from "@/components/searchable-select";
+import { LinkedTenantSelect } from "@/components/linked-tenant-select";
+import { useLocation } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -73,6 +78,7 @@ function isValidEmail(value: string) {
 export default function PublicWorkspaceQueue() {
   const [queue, setQueue] = useState<QueueListItem[]>([]);
   const [properties, setProperties] = useState<WorkspaceProperty[]>([]);
+  const notificationLocation = useLocation();
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState<QueueDetail | null>(null);
   const [showLinkForm, setShowLinkForm] = useState(false);
@@ -148,8 +154,8 @@ export default function PublicWorkspaceQueue() {
   }, []);
 
   useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+    void loadQueue(new URLSearchParams(notificationLocation.search).get("caseId") || undefined);
+  }, [loadQueue, notificationLocation.search]);
 
   useEffect(() => {
     void loadDetail(selectedId);
@@ -192,7 +198,7 @@ export default function PublicWorkspaceQueue() {
   );
 
   const propertyOptions = useMemo(
-    () => properties.map((property) => ({ value: property.id, label: `${property.summaryLabel} · ${property.address}` })),
+    () => properties.map((property) => ({ id: property.id, label: `${property.summaryLabel} · ${property.address}`, searchText: [property.name, property.address, property.city, property.state].join(" ") })),
     [properties]
   );
 
@@ -205,7 +211,8 @@ export default function PublicWorkspaceQueue() {
     if (!selectedProperty) return [];
     return selectedProperty.units
       .map((unit) => ({
-        value: unit.id,
+        id: unit.id,
+        searchText: [unit.label, unit.address, unit.city, unit.state].join(" "),
         label: `${unit.label} · ${unit.bedroomCount} bed · ${unit.bathroomCount} bath · ${occupancyLabel(unit.isOccupied)}`
       }));
   }, [selectedProperty]);
@@ -346,7 +353,7 @@ export default function PublicWorkspaceQueue() {
   }
 
   async function requestRentScore() {
-    if (!detail) return;
+    if (!detail || !canRequestScore) return;
     try {
       await requestWorkspaceRentScore(detail.id, detail.notes || undefined);
       await loadQueue(detail.id);
@@ -414,7 +421,7 @@ export default function PublicWorkspaceQueue() {
     }
   }
 
-  const canRequestScore = Boolean(detail && !detail.scoreRequests.length);
+  const canRequestScore = Boolean(detail && detail.renterLinkResponseStatus === "ACCEPTED" && !detail.scoreRequests.length);
   const renterLinkAccepted = detail?.renterLinkResponseStatus === "ACCEPTED";
   const requestButtonLabel = detail?.scoreRequests.length ? "Rent score requested" : "Request rent score";
   const isApprovedTenant = detail?.decision?.decision === "APPROVED";
@@ -456,7 +463,7 @@ export default function PublicWorkspaceQueue() {
             ) : null}
             <div className="space-y-2">
               <Label>Property</Label>
-              <Select
+              <SearchableSelect
                 value={draft.propertyId}
                 onValueChange={(value) => {
                   const nextProperty = properties.find((property) => property.id === value) || null;
@@ -468,37 +475,26 @@ export default function PublicWorkspaceQueue() {
                   resetSearchFlow(value);
                 }}
                 disabled={!properties.length}
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Select property" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {propertyOptions.map((property) => (
-                    <SelectItem key={property.value} value={property.value}>
-                      {property.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+                items={propertyOptions}
+                placeholder="Select property"
+                searchPlaceholder="Search property name or address…"
+                emptyMessage="No matching properties. Try another name or address."
+              />
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
-              <Select
+              <SearchableSelect
                 value={draft.propertyUnitId}
                 onValueChange={(value) => setDraft((current) => ({ ...current, propertyUnitId: value }))}
                 disabled={!selectedProperty || !propertyUnitOptions.length}
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent className="bg-white">
-                  {propertyUnitOptions.map((unit) => (
-                    <SelectItem key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+                items={propertyUnitOptions}
+                placeholder="Select unit"
+                searchPlaceholder="Search units in the selected property…"
+                emptyMessage="No matching units in this property."
+                key={draft.propertyId}
+              />
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 md:p-4">
               <p className="text-sm font-semibold text-slate-950">Search</p>
@@ -580,6 +576,7 @@ export default function PublicWorkspaceQueue() {
         <Card className="border-slate-200 shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Linked tenants</CardTitle>
+            <p className="text-sm text-slate-500">Most recently updated first.</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? <p className="text-sm text-muted-foreground">Loading...</p> : null}
@@ -588,18 +585,7 @@ export default function PublicWorkspaceQueue() {
             {!loading && queue.length ? (
               <div className="space-y-2">
                 <Label>Linked tenant</Label>
-                <Select value={selectedId} onValueChange={setSelectedId}>
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Select linked tenant" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white">
-                    {queue.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {renterName(item)} · {propertyDisplayName(item.property)} · {propertyUnitDisplayName(item.propertyUnit)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <LinkedTenantSelect items={queue} value={selectedId} onValueChange={setSelectedId} />
               </div>
             ) : null}
           </CardContent>
@@ -624,8 +610,9 @@ export default function PublicWorkspaceQueue() {
                         </div>
                         <div className="sm:justify-self-end">
                           <Badge className={decisionBadgeClass(detail.decision?.decision)} variant="outline">
-                            {detail.decision?.decision || detail.status}
+                            {applicationDecisionLabel(detail.decision?.decision || detail.status, detail.additionalInformationResponse, detail.requestedInformation)}
                           </Badge>
+                          {detail.decision?.decision === "HOLD" && <InformationRequestStatus caseId={detail.id} requestedInformation={detail.requestedInformation} response={detail.additionalInformationResponse} />}
                         </div>
                       </div>
                     </div>
@@ -709,7 +696,7 @@ export default function PublicWorkspaceQueue() {
                   </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <Button onClick={() => void requestRentScore()} disabled={!canRequestScore || !renterLinkAccepted} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)]">
+                    <Button onClick={() => void requestRentScore()} disabled={!canRequestScore} title={!renterLinkAccepted ? "Awaiting renter acceptance of the property link" : undefined} className="bg-[var(--rentsure-blue)] hover:bg-[var(--rentsure-blue-deep)] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100">
                       <ArrowRight className="mr-2 h-4 w-4" />
                       {requestButtonLabel}
                     </Button>
